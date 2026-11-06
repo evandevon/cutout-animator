@@ -120,11 +120,13 @@ const Sound = (() => {
   const mic={stream:null,node:null,src:null,sink:null,chunks:null,level:0};
   const WORKLET=`class Cap extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor('cap',Cap)`;
   function onSamples(s){ let p=0; for(let i=0;i<s.length;i+=8) p=Math.max(p,Math.abs(s[i])); mic.level=Math.max(p,mic.level*.85); if(mic.chunks) mic.chunks.push(s); }
-  async function micStart(){
-    if(mic.stream) return true;
+  let micBusy=null;
+  function micStart(deviceId){ if(mic.stream) return Promise.resolve(true); if(!micBusy) micBusy=micOpen(deviceId).finally(()=>micBusy=null); return micBusy; }
+  async function micOpen(deviceId){
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) return false;
-    const c=audioCtx();
-    mic.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    const c=audioCtx(), base={echoCancellation:true,noiseSuppression:true,autoGainControl:true};
+    try{ mic.stream=await navigator.mediaDevices.getUserMedia({audio:deviceId?{...base,deviceId:{exact:deviceId}}:base}); }
+    catch(e){ if(!deviceId||e.name==='NotAllowedError') throw e; mic.stream=await navigator.mediaDevices.getUserMedia({audio:base}); } // that microphone has gone: use the default
     mic.src=c.createMediaStreamSource(mic.stream);
     mic.sink=c.createGain(); mic.sink.gain.value=0; mic.sink.connect(c.destination);
     try{

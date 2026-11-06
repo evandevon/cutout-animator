@@ -137,6 +137,18 @@ const Cut = (() => {
     src=c; W=c.width; H=c.height; pix=g.getImageData(0,0,W,H).data; edit=ne; undo=[]; recompute();
   }
 
+  /* Bulk path for template sheets: no editor, default settings. */
+  async function autoCut(canvas){
+    const w=canvas.width,h=canvas.height,p=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,saved=whiteGain,keep=autoMask(p,w,h,190,true),g=whiteGain; whiteGain=saved;
+    let x0=w,y0=h,x1=-1,y1=-1,n=0; for(let y=0;y<h;y++)for(let x=0;x<w;x++) if(keep[y*w+x]){ n++; if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y; }
+    if(n<w*h*.002) return null;
+    const cw=x1-x0+1,ch=y1-y0+1,c=document.createElement('canvas'); c.width=cw;c.height=ch; const x=c.getContext('2d'),d=x.createImageData(cw,ch);
+    for(let yy=0;yy<ch;yy++)for(let xx=0;xx<cw;xx++){ const i=(yy+y0)*w+xx+x0; if(!keep[i]) continue; const q=i*4,o=(yy*cw+xx)*4; let s=0,t=0; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ const X=xx+x0+dx,Y=yy+y0+dy; if(X>=0&&Y>=0&&X<w&&Y<h){ s+=keep[Y*w+X]; t++; } } d.data[o]=p[q]*g;d.data[o+1]=p[q+1]*g;d.data[o+2]=p[q+2]*g;d.data[o+3]=Math.round(255*Math.min(1,s/t*1.25)); }
+    x.putImageData(d,0,0); const blob=await new Promise(r=>c.toBlob(r,'image/png')); return {blob,w:cw,h:ch};
+  }
+  let fixDone=null;
+  function editBox(canvas,done){ fixDone=done; mode='cutout'; $('capTitle').textContent='Fix this cutout'; $('capDlg').showModal(); setImage(canvas,canvas.width,canvas.height); $('cutBackdrop').hidden=$('cutAnother').hidden=$('cutRetake').hidden=true; $('cutDone').textContent='✓ Use this cutout'; }
+
   async function finish(another){
     let x0=W,y0=H,x1=-1,y1=-1; const k=new Uint8Array(W*H);
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const i=y*W+x; if(kept(i)){ k[i]=1; if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y; } }
@@ -150,6 +162,7 @@ const Cut = (() => {
     const z=Math.min(1,OUT_EDGE/Math.max(cw,ch)); let out=c;
     if(z<1){ out=document.createElement('canvas'); out.width=Math.round(cw*z); out.height=Math.round(ch*z); const o=out.getContext('2d'); o.imageSmoothingQuality='high'; o.drawImage(c,0,0,out.width,out.height); }
     const blob=await new Promise(r=>out.toBlob(r,'image/png'));
+    if(fixDone){ const f=fixDone; f({blob,w:out.width,h:out.height}); close(); return; }
     await onCutout(blob,out.width,out.height);
     if(another){
       // Blank out what was just taken, so the next cut is whatever else is on the page.
@@ -178,7 +191,7 @@ const Cut = (() => {
   function stopCam(){ if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('camVideo').srcObject=null; }
   function showSource(){ src=null; $('capCut').hidden=true; $('capSource').hidden=false; startCam(); }
   function open(m){ mode=m; $('capTitle').textContent=m==='backdrop'?'Add a backdrop':'Add a drawing'; $('capDlg').showModal(); showSource(); }
-  function close(){ stopCam(); src=null; $('capDlg').close(); }
+  function close(){ stopCam(); src=null; fixDone=null; $('cutBackdrop').hidden=$('cutRetake').hidden=false; $('cutDone').textContent='✓ Add to stage'; $('capDlg').close(); }
 
   function init(o){
     ({onCutout,onBackdrop,toast}=o);
@@ -200,5 +213,5 @@ const Cut = (() => {
     $('cutBackdrop').onclick=asBackdrop; $('cutRetake').onclick=showSource;
     window.addEventListener('resize',()=>{ if($('capDlg').open&&src) draw(); });
   }
-  return {init,open};
+  return {init,open,autoCut,edit:editBox};
 })();

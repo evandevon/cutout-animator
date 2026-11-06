@@ -14,11 +14,9 @@
   <div class="spacer"></div>
   <button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
   <button id="redoBtn" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
-  <button id="newBtn">New</button>
-  <button id="openBtn">Open</button>
-  <button id="saveBtn">Save project</button>
-  <button id="exportBtn" class="primary">Make video</button>
-  <button id="helpBtn" aria-label="Help">?</button>
+  <button id="saveBtn" aria-label="Save project" title="Save a project file you can keep editing">💾<span class="lab2"> Save</span></button>
+  <button id="exportBtn" class="primary" aria-label="Make video">🎬<span class="lab2"> Make video</span></button>
+  <button id="menuBtn" aria-label="More options">☰</button>
   <input type="file" id="openInput" hidden>
 </header>
 
@@ -53,9 +51,8 @@
       <label class="row">Background <input type="range" id="mixAmb" min="0" max="1.5" step=".05"></label>
       <label class="row">Music <input type="range" id="mixMus" min="0" max="1.5" step=".05"></label>
       <label class="row">Effects <input type="range" id="mixFx" min="0" max="1.5" step=".05"></label>
-      <h3>Effect buttons</h3>
-      <p class="hint">Tap these while recording to add a sound.</p>
-      <div id="padEdit" class="pads"></div>
+      <h3>Sound effects</h3>
+      <p class="hint">Tick a sound to get a big button under the stage. Tap it while recording.</p>
       <div id="sfxLib"></div>
     </section>
   </aside>
@@ -64,30 +61,39 @@
     <div id="stageWrap">
       <canvas id="stage" tabindex="0" role="application" aria-label="Stage. Use Tab to choose a cutout, arrow keys to move it, square brackets to resize, comma and full stop to turn, F to flip."></canvas>
       <div id="emptyHint" hidden>Add a drawing to get started</div>
+      <div id="teachHint" hidden>Drag it the way it should move, then let go</div>
       <div id="countdown" hidden aria-live="assertive"></div>
+      <div id="itemBar" hidden>
+        <button id="itAlive" aria-pressed="false" title="Alive cutouts sway a little, like someone standing still. Objects stay still."></button>
+        <button id="itLoop" aria-label="Teach a looping move">🔁<span class="lab2"> Teach a move</span></button>
+        <button id="itLoopRedo" aria-label="Teach the move again" title="Teach the move again" hidden>↺</button>
+        <button id="itFlip" aria-label="Flip">⇄<span class="lab2"> Flip</span></button>
+        <button id="itFwd" aria-label="Move in front">⬆<span class="lab2"> Front</span></button>
+        <button id="itBack" aria-label="Move behind">⬇<span class="lab2"> Behind</span></button>
+        <button id="itDup" aria-label="Copy">⧉<span class="lab2"> Copy</span></button>
+        <button id="itDel" class="danger" aria-label="Remove">✕<span class="lab2"> Remove</span></button>
+      </div>
     </div>
-    <div id="itemBar" hidden>
-      <button id="itFlip">⇄ Flip</button>
-      <button id="itFwd">⬆ Forward</button>
-      <button id="itBack">⬇ Back</button>
-      <button id="itDup">⧉ Copy</button>
-      <button id="itDel" class="danger">✕ Remove</button>
-    </div>
+    <button id="scriptView" hidden aria-label="Script. Tap to hide."><img id="scriptImg" alt="The script for this scene"></button>
+    <div id="padRow" class="pads" hidden></div>
     <div id="transport">
       <button id="recBtn" class="rec"><span class="dot"></span> Record</button>
-      <button id="layerBtn" title="Play this scene and record more movement or voice on top" disabled>＋ Add to recording</button>
-      <button id="playBtn" disabled>▶ Play scene</button>
-      <button id="playAllBtn" disabled>▶▶ Play all</button>
-      <label class="check"><input type="checkbox" id="voiceOn" checked> 🎤 Voice</label>
-      <label class="check"><input type="checkbox" id="wobble" checked> Wobble</label>
-      <span id="takeInfo" aria-live="polite"></span>
+      <button id="playBtn" hidden>▶ Play</button>
+      <button id="layerBtn" hidden title="Play this scene and record more movement or voice on top">＋ Add more</button>
+      <button id="playAllBtn" hidden>▶▶ Play all</button>
+      <div id="micBox">
+        <label class="check"><input type="checkbox" id="voiceOn" checked> 🎤<span class="sr"> Record my voice</span></label>
+        <button id="micEnable" hidden>Turn on microphone</button>
+        <span id="micMsg" hidden></span>
+        <span class="meter" id="micMeter" role="img" aria-label="Microphone volume" hidden><span class="micBar"></span></span>
+        <select id="micSel" aria-label="Choose microphone" hidden></select>
+      </div>
     </div>
     <div id="recBar" hidden>
       <button id="stopBtn" class="rec"><span class="sq"></span> Stop</button>
       <button id="nextSceneBtn">Next scene ▶</button>
       <span id="timer" role="timer">0:00</span>
-      <span id="micLevelWrap" title="Microphone level"><span id="micLevel"></span></span>
-      <div id="padLive" class="pads"></div>
+      <span class="meter" id="micLevelWrap" role="img" aria-label="Microphone volume"><span class="micBar"></span></span>
     </div>
   </section>
 </main>
@@ -95,8 +101,9 @@
 <footer id="scenes">
   <div id="sceneList" aria-label="Scenes"></div>
   <div id="sceneBtns">
-    <button id="addScene">＋ Scene</button>
-    <button id="dupScene" title="New scene that starts where this one finishes">⧉ Continue</button>
+    <button id="moveL" aria-label="Move scene earlier">◀</button>
+    <button id="moveR" aria-label="Move scene later">▶</button>
+    <button id="dupScene" aria-label="Continue in a new scene" title="New scene that starts where this one finishes">⧉<span class="lab2"> Continue</span></button>
     <button id="delScene" class="danger" aria-label="Delete scene">✕</button>
   </div>
 </footer>
@@ -120,7 +127,7 @@
   </div>
   <div id="capCut" class="capBody" hidden>
     <div class="cutBox"><canvas id="cutCanvas"></canvas></div>
-    <div class="capTools">
+    <div class="capSide"><div class="capTools">
       <label class="check"><input type="checkbox" id="autoPaper" checked> Remove white paper</label>
       <label class="stack" id="threshWrap">Keep fainter lines <input type="range" id="thresh" min="60" max="255" value="190"></label>
       <label class="check" id="holesWrap"><input type="checkbox" id="keepHoles" checked> Keep white inside the drawing</label>
@@ -137,13 +144,32 @@
         <button id="cutFlip">⇄ Flip</button>
         <button id="cutReset">Start again</button>
       </div>
-      <div class="spacer"></div>
-      <button id="cutDone" class="primary big">✓ Add to stage</button>
       <button id="cutAnother">✓ Add, then cut another from this page</button>
-      <button id="cutBackdrop">Use whole photo as backdrop</button>
       <button id="cutRetake">← Take a different photo</button>
+      </div>
+      <div class="capActions">
+        <button id="cutDone" class="primary big">✓ Add to stage</button>
+        <button id="cutBackdrop">Use whole photo as backdrop</button>
+      </div>
     </div>
   </div>
+</dialog>
+
+<dialog id="tplDlg" class="full">
+  <div class="dlgHead"><h2>Add filled-in templates</h2><div class="spacer"></div><button id="tplClose">Close</button></div>
+  <div class="tplTools">
+    <button id="tplChoose" class="primary">📄 Choose JPGs or PDFs</button>
+    <button id="tplWebcam">📷 Use the webcam</button>
+    <span id="tplStatus" aria-live="polite"></span>
+    <input type="file" id="tplInput" multiple accept="image/*,application/pdf,.pdf" hidden>
+  </div>
+  <div id="tplCam" hidden>
+    <video id="tplVideo" playsinline muted autoplay></video>
+    <div class="tplCamSide"><p id="tplCamMsg" aria-live="polite"></p><button id="tplSnap" class="big">📸 Capture</button><button id="tplCamNext" hidden>🔄 Switch camera</button></div>
+  </div>
+  <p id="tplEmpty" class="hint">Each sheet becomes one scene. You can select lots of files at once, or use a PDF with one sheet per page.</p>
+  <div id="tplRows"></div>
+  <div class="dlgBtns"><button id="tplAdd" class="primary big" disabled>✓ Add scenes</button></div>
 </dialog>
 
 <dialog id="askDlg"><h2 id="askTitle"></h2><p id="askMsg"></p><input id="askInput" hidden><div id="askBtns" class="dlgBtns"></div></dialog>
@@ -166,17 +192,35 @@
   </div>
 </dialog>
 
+<dialog id="menuDlg">
+  <h2>More options</h2>
+  <div class="menuBtns">
+    <button id="newBtn">📄 New project</button>
+    <button id="openBtn">📂 Open a project file</button>
+    <button id="helpBtn">❓ How it works</button>
+    <button id="tplBtn">🗂 Add filled-in templates</button>
+    <a class="btn" href="templates/cutout-template-A4.pdf" download>🖨 Print a template (A4)</a>
+    <a class="btn" href="templates/cutout-template-A3.pdf" download>🖨 Print a template (A3)</a>
+  </div>
+  <div class="dlgBtns"><button id="menuClose" class="primary">Close</button></div>
+</dialog>
+
 <dialog id="helpDlg">
   <h2>How it works</h2>
+  <p>Cutout Animator lives at <a href="https://evandevon.github.io/cutout-animator/" target="_blank" rel="noopener">evandevon.github.io/cutout-animator</a>. Open it in a browser on any computer, tablet or phone.</p>
   <ol>
     <li><b>Add a drawing.</b> Photograph it on white paper and the paper is cut away. Draw around it or use the brushes to tidy it up.</li>
-    <li><b>Set the scene.</b> Choose a backdrop and sounds, then place your cutouts. Park cutouts in the dark area outside the frame so they can walk on later. That area isn't in the video.</li>
+    <li><b>Set the scene.</b> Choose a backdrop, background sound and music, then place your cutouts. Tap a cutout and choose <b>Alive</b> if it's a person or creature, so it sways a little instead of standing frozen. Park cutouts in the dark area outside the frame so they can walk on later. That area isn't in the video.</li>
     <li><b>Press Record.</b> Tell the story and drag your cutouts at the same time. Several people can drag different cutouts on a touch screen.</li>
-    <li><b>Add to recording.</b> Plays the scene back so you can move another cutout or add more voice. This is how to move several cutouts with a mouse.</li>
+    <li><b>Teach a move.</b> Tap a cutout, press Teach a move, then drag it and let go. It repeats that move for the whole recording. If you grab it, it follows you, then glides back to where you grabbed it and carries on.</li>
+    <li><b>Sound effects.</b> Tick sounds in the Sounds tab to get big buttons under the stage. Tap them while recording.</li>
+    <li><b>Add more.</b> Plays the scene back so you can move another cutout or add more voice. This is how to move several cutouts with a mouse.</li>
     <li><b>Make video</b> joins your scenes into a video. <b>Save project</b> keeps a file you can open later and keep editing.</li>
   </ol>
+  <h3>Templates for a whole class</h3>
+  <p>In the ☰ menu, print a template. Students draw a backdrop and characters, write a script and tick sounds. Then choose <b>Add filled-in templates</b> and pick the scanned JPGs or PDFs, or use a webcam. Each sheet becomes one scene, and the script shows on screen during recording.</p>
   <h3>Moving cutouts</h3>
-  <p>Drag to move. Pinch with two fingers, or use the round handle or mouse wheel, to resize and turn. Hold Shift with the wheel to turn. Double-tap to flip.</p>
+  <p>Drag to move, with a finger or the mouse. Pinch with two fingers, or use the round handle or mouse wheel, to resize and turn. Hold Shift with the wheel to turn. Double-tap to flip.</p>
   <h3>Keyboard</h3>
   <p>Tab chooses a cutout. Arrows move it, <kbd>[</kbd> <kbd>]</kbd> resize, <kbd>,</kbd> <kbd>.</kbd> turn, <kbd>F</kbd> flips, <kbd>R</kbd> records, <kbd>Esc</kbd> stops.</p>
   <div class="dlgBtns"><button id="helpClose" class="primary">Got it</button></div>
@@ -185,8 +229,10 @@
 <div id="toast" role="status" hidden></div>
 <script src="vendor/jszip.js"></script>
 <script src="vendor/mp4-muxer.js"></script>
+<script src="vendor/pdf/pdf.min.js"></script>
 <script src="audio.js"></script>
 <script src="cut.js"></script>
+<script src="template.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
