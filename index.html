@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Cutout Animator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="top">
+  <h1><span aria-hidden="true">✂︎</span> Cutout Animator</h1>
+  <input id="projName" aria-label="Project name" value="My animation" maxlength="60">
+  <div class="spacer"></div>
+  <button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+  <button id="redoBtn" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+  <button id="newBtn">New</button>
+  <button id="openBtn">Open</button>
+  <button id="saveBtn">Save project</button>
+  <button id="exportBtn" class="primary">Make video</button>
+  <button id="helpBtn" aria-label="Help">?</button>
+  <input type="file" id="openInput" hidden>
+</header>
+
+<main id="main">
+  <aside id="side">
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="cast" class="on">Cutouts</button>
+      <button role="tab" data-tab="back">Backdrop</button>
+      <button role="tab" data-tab="sound">Sounds</button>
+    </div>
+    <section class="tab" id="tab-cast">
+      <button id="addDrawing" class="primary wide">📷 Add a drawing</button>
+      <button id="addWords" class="wide">Aa Add words</button>
+      <p class="hint">Tap a cutout to put it on the stage.</p>
+      <div id="castList" class="grid"></div>
+    </section>
+    <section class="tab" id="tab-back" hidden>
+      <button id="addBackdrop" class="primary wide">📷 Add a backdrop</button>
+      <div id="backList" class="grid wideThumbs"></div>
+      <label class="row">Plain colour <input type="color" id="backColor" value="#bfe3f5"></label>
+    </section>
+    <section class="tab" id="tab-sound" hidden>
+      <h3>This scene</h3>
+      <label class="stack">Background sound
+        <span class="row"><select id="ambSel"></select><button id="ambPrev" class="small" aria-label="Preview background sound">▶</button></span></label>
+      <label class="stack">Music
+        <span class="row"><select id="musSel"></select><button id="musPrev" class="small" aria-label="Preview music">▶</button></span></label>
+      <button id="uploadSound" class="wide">Use my own sound file</button>
+      <input type="file" id="soundInput" accept="audio/*,.mp3,.wav,.m4a,.ogg" hidden>
+      <h3>Volume (whole project)</h3>
+      <label class="row">Voice <input type="range" id="mixVoice" min="0" max="1.5" step=".05"></label>
+      <label class="row">Background <input type="range" id="mixAmb" min="0" max="1.5" step=".05"></label>
+      <label class="row">Music <input type="range" id="mixMus" min="0" max="1.5" step=".05"></label>
+      <label class="row">Effects <input type="range" id="mixFx" min="0" max="1.5" step=".05"></label>
+      <h3>Effect buttons</h3>
+      <p class="hint">Tap these while recording to add a sound.</p>
+      <div id="padEdit" class="pads"></div>
+      <div id="sfxLib"></div>
+    </section>
+  </aside>
+
+  <section id="center">
+    <div id="stageWrap">
+      <canvas id="stage" tabindex="0" role="application" aria-label="Stage. Use Tab to choose a cutout, arrow keys to move it, square brackets to resize, comma and full stop to turn, F to flip."></canvas>
+      <div id="emptyHint" hidden>Add a drawing to get started</div>
+      <div id="countdown" hidden aria-live="assertive"></div>
+    </div>
+    <div id="itemBar" hidden>
+      <button id="itFlip">⇄ Flip</button>
+      <button id="itFwd">⬆ Forward</button>
+      <button id="itBack">⬇ Back</button>
+      <button id="itDup">⧉ Copy</button>
+      <button id="itDel" class="danger">✕ Remove</button>
+    </div>
+    <div id="transport">
+      <button id="recBtn" class="rec"><span class="dot"></span> Record</button>
+      <button id="layerBtn" title="Play this scene and record more movement or voice on top" disabled>＋ Add to recording</button>
+      <button id="playBtn" disabled>▶ Play scene</button>
+      <button id="playAllBtn" disabled>▶▶ Play all</button>
+      <label class="check"><input type="checkbox" id="voiceOn" checked> 🎤 Voice</label>
+      <label class="check"><input type="checkbox" id="wobble" checked> Wobble</label>
+      <span id="takeInfo" aria-live="polite"></span>
+    </div>
+    <div id="recBar" hidden>
+      <button id="stopBtn" class="rec"><span class="sq"></span> Stop</button>
+      <button id="nextSceneBtn">Next scene ▶</button>
+      <span id="timer" role="timer">0:00</span>
+      <span id="micLevelWrap" title="Microphone level"><span id="micLevel"></span></span>
+      <div id="padLive" class="pads"></div>
+    </div>
+  </section>
+</main>
+
+<footer id="scenes">
+  <div id="sceneList" aria-label="Scenes"></div>
+  <div id="sceneBtns">
+    <button id="addScene">＋ Scene</button>
+    <button id="dupScene" title="New scene that starts where this one finishes">⧉ Continue</button>
+    <button id="delScene" class="danger" aria-label="Delete scene">✕</button>
+  </div>
+</footer>
+
+<!-- Capture and cut-out -->
+<dialog id="capDlg" class="full">
+  <div class="dlgHead">
+    <h2 id="capTitle">Add a drawing</h2><div class="spacer"></div>
+    <button id="capClose">Close</button>
+  </div>
+  <div id="capSource" class="capBody">
+    <div class="camBox"><video id="camVideo" playsinline muted autoplay></video><div id="camMsg"></div></div>
+    <div class="capTools">
+      <button id="snapBtn" class="primary big">📸 Take photo</button>
+      <button id="camSwitch">🔄 Switch camera</button>
+      <button id="uploadImg">🖼 Choose a picture</button>
+      <button id="pasteImg">📋 Paste</button>
+      <p class="hint">Dark pens and bright colours on white paper cut out best. Keep the whole sheet in view and avoid shadows.</p>
+      <input type="file" id="imgInput" accept="image/*" hidden>
+    </div>
+  </div>
+  <div id="capCut" class="capBody" hidden>
+    <div class="cutBox"><canvas id="cutCanvas"></canvas></div>
+    <div class="capTools">
+      <label class="check"><input type="checkbox" id="autoPaper" checked> Remove white paper</label>
+      <label class="stack" id="threshWrap">Keep fainter lines <input type="range" id="thresh" min="60" max="255" value="190"></label>
+      <label class="check" id="holesWrap"><input type="checkbox" id="keepHoles" checked> Keep white inside the drawing</label>
+      <div class="toolRow" role="group" aria-label="Cut tools">
+        <button data-tool="lasso" class="on">✂ Draw around</button>
+        <button data-tool="erase">Erase</button>
+        <button data-tool="restore">Bring back</button>
+        <button data-tool="magic">Tap to remove</button>
+      </div>
+      <label class="stack">Brush size <input type="range" id="brush" min="6" max="120" value="36"></label>
+      <div class="toolRow">
+        <button id="cutUndo">↶ Undo</button>
+        <button id="cutRot">↻ Turn</button>
+        <button id="cutFlip">⇄ Flip</button>
+        <button id="cutReset">Start again</button>
+      </div>
+      <div class="spacer"></div>
+      <button id="cutDone" class="primary big">✓ Add to stage</button>
+      <button id="cutAnother">✓ Add, then cut another from this page</button>
+      <button id="cutBackdrop">Use whole photo as backdrop</button>
+      <button id="cutRetake">← Take a different photo</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="askDlg"><h2 id="askTitle"></h2><p id="askMsg"></p><input id="askInput" hidden><div id="askBtns" class="dlgBtns"></div></dialog>
+
+<dialog id="exportDlg">
+  <h2>Make video</h2>
+  <div id="expSetup">
+    <p id="expInfo"></p>
+    <label class="stack">Size
+      <select id="expSize"><option value="1280">720p (HD, smaller file)</option><option value="1920" selected>1080p (Full HD)</option></select></label>
+    <div class="dlgBtns"><button id="expCancel">Cancel</button><button id="expGo" class="primary">Make video</button></div>
+  </div>
+  <div id="expRun" hidden>
+    <p id="expStatus" aria-live="polite"></p><progress id="expProg" max="1" value="0"></progress>
+  </div>
+  <div id="expDone" hidden>
+    <video id="expVideo" controls playsinline></video>
+    <p id="expNote"></p>
+    <div class="dlgBtns"><button id="expClose">Close</button><button id="expShare" hidden>Share</button><a id="expDl" class="btn primary">Download video</a></div>
+  </div>
+</dialog>
+
+<dialog id="helpDlg">
+  <h2>How it works</h2>
+  <ol>
+    <li><b>Add a drawing.</b> Photograph it on white paper and the paper is cut away. Draw around it or use the brushes to tidy it up.</li>
+    <li><b>Set the scene.</b> Choose a backdrop and sounds, then place your cutouts. Park cutouts in the dark area outside the frame so they can walk on later. That area isn't in the video.</li>
+    <li><b>Press Record.</b> Tell the story and drag your cutouts at the same time. Several people can drag different cutouts on a touch screen.</li>
+    <li><b>Add to recording.</b> Plays the scene back so you can move another cutout or add more voice. This is how to move several cutouts with a mouse.</li>
+    <li><b>Make video</b> joins your scenes into a video. <b>Save project</b> keeps a file you can open later and keep editing.</li>
+  </ol>
+  <h3>Moving cutouts</h3>
+  <p>Drag to move. Pinch with two fingers, or use the round handle or mouse wheel, to resize and turn. Hold Shift with the wheel to turn. Double-tap to flip.</p>
+  <h3>Keyboard</h3>
+  <p>Tab chooses a cutout. Arrows move it, <kbd>[</kbd> <kbd>]</kbd> resize, <kbd>,</kbd> <kbd>.</kbd> turn, <kbd>F</kbd> flips, <kbd>R</kbd> records, <kbd>Esc</kbd> stops.</p>
+  <div class="dlgBtns"><button id="helpClose" class="primary">Got it</button></div>
+</dialog>
+
+<div id="toast" role="status" hidden></div>
+<script src="vendor/jszip.js"></script>
+<script src="vendor/mp4-muxer.js"></script>
+<script src="audio.js"></script>
+<script src="cut.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
