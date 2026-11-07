@@ -139,11 +139,12 @@ const Cut = (() => {
 
   /* Bulk path for template sheets: no editor, default settings. */
   async function autoCut(canvas){
-    const w=canvas.width,h=canvas.height,p=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,saved=whiteGain,keep=autoMask(p,w,h,190,true),g=whiteGain; whiteGain=saved;
+    const w=canvas.width,h=canvas.height,p=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,saved=whiteGain; let keep=autoMask(p,w,h,190,true),cnt=0; for(let i=0;i<keep.length;i++) cnt+=keep[i]; let faint=false; if(cnt<w*h*.01){ keep=autoMask(p,w,h,262,true); faint=true; } const g=whiteGain; whiteGain=saved;
+    const ink=v=>faint?Math.max(0,255-(255-v*g)*2.4):v*g; // light pencil: darken the lines so they show up on the stage
     let x0=w,y0=h,x1=-1,y1=-1,n=0; for(let y=0;y<h;y++)for(let x=0;x<w;x++) if(keep[y*w+x]){ n++; if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y; }
     if(n<w*h*.002) return null;
     const cw=x1-x0+1,ch=y1-y0+1,c=document.createElement('canvas'); c.width=cw;c.height=ch; const x=c.getContext('2d'),d=x.createImageData(cw,ch);
-    for(let yy=0;yy<ch;yy++)for(let xx=0;xx<cw;xx++){ const i=(yy+y0)*w+xx+x0; if(!keep[i]) continue; const q=i*4,o=(yy*cw+xx)*4; let s=0,t=0; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ const X=xx+x0+dx,Y=yy+y0+dy; if(X>=0&&Y>=0&&X<w&&Y<h){ s+=keep[Y*w+X]; t++; } } d.data[o]=p[q]*g;d.data[o+1]=p[q+1]*g;d.data[o+2]=p[q+2]*g;d.data[o+3]=Math.round(255*Math.min(1,s/t*1.25)); }
+    for(let yy=0;yy<ch;yy++)for(let xx=0;xx<cw;xx++){ const i=(yy+y0)*w+xx+x0; if(!keep[i]) continue; const q=i*4,o=(yy*cw+xx)*4; let s=0,t=0; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ const X=xx+x0+dx,Y=yy+y0+dy; if(X>=0&&Y>=0&&X<w&&Y<h){ s+=keep[Y*w+X]; t++; } } d.data[o]=ink(p[q]);d.data[o+1]=ink(p[q+1]);d.data[o+2]=ink(p[q+2]);d.data[o+3]=Math.round(255*Math.min(1,s/t*1.25)); }
     x.putImageData(d,0,0); const blob=await new Promise(r=>c.toBlob(r,'image/png')); return {blob,w:cw,h:ch};
   }
   let fixDone=null;

@@ -25,12 +25,13 @@ def make(path,size):
     rect(*BG); rect(*SCRIPT); text(10,116.8,'My script: what will you say?',8.5,True)
     for i,(x,y,w,h) in enumerate(CHARS):
         text(x,y-1.2,f'Character {i+1}',8.5,True); rect(x,y,w,h)
-        rect(x,y+39.5,6,6,.7); text(x+7.5,y+44.3,'Alive (it sways a little)',7.5)
+        for dx,lab in zip([0,13.5,27,40.5],['Sway','Hop','Float','Spin']):
+            rect(x+dx,y+39.5,5,5,.7); text(x+dx+6,y+43.4,lab,7.5)
     for col,(title,items) in zip(COLS,LISTS):
         text(col,125,title,8.5,True)
         for i,t in enumerate(items):
             rect(col,rowy(i),6,6,.7); text(col+7.5,rowy(i)+4.6,t,9)
-    text(24,200,'Tick one background sound and one music. Tick any sound effects you want.',8)
+    text(24,200,'Tick the sounds you want. Tick how each character moves, or none to keep it still.',8)
     text(150,200,'evandevon.github.io/cutout-animator',8)
     c.showPage(); c.save()
-make('templates/cutout-template-A4.pdf',(297,210)); make('templates/cutout-template-A3.pdf',(420,297))
+make('templates/cutout-template-A4.pdf',(297,210))

@@ -69,12 +69,15 @@ function drawBackdrop(c,b){
    and the setting can be changed after recording. */
 function animAt(it,h,t){ let n=0; for(const ch of it.id) n=(n*31+ch.charCodeAt(0))%9973; const f=n/9973*6.283,a=clamp(h/300,.4,1.6),none={x:0,y:0,r:0,s:1};
   switch(it.anim){
-    case 'sway': return {x:a*(5*Math.sin(.53*t+f)+2.5*Math.sin(1.31*t+2*f)),y:a*(2.5*Math.sin(.71*t+3*f)+1.5*Math.sin(1.9*t+f)),r:.022*Math.sin(.61*t+f)+.008*Math.sin(1.47*t+4*f),s:1+.012*Math.sin(1.7*t+2*f)};
+    case 'sway': return {x:0,y:0,r:.028*Math.sin(.61*t+f)+.009*Math.sin(1.47*t+4*f),s:1,sy:1+.016*Math.sin(1.7*t+2*f),feet:true}; // rocks and breathes from the feet, which barely move
     case 'hop': return {x:0,y:-a*34*Math.abs(Math.sin(2.8*t+f)),r:.04*Math.sin(2.8*t+f),s:1};
     case 'float': return {x:a*7*Math.sin(.6*t+f),y:a*14*Math.sin(1.15*t+f),r:.06*Math.sin(.9*t+2*f),s:1};
     case 'spin': return {x:0,y:0,r:1.5*t,s:1};
     default: return none; } }
-function drawItem(c,it,p,t=0){ const im=imgs.get(it.assetId); if(!im) return; let w=im.naturalWidth*p.s,h=im.naturalHeight*p.s; const v=animAt(it,h,t); w*=v.s; h*=v.s; c.save(); c.translate(p.x+v.x,p.y+v.y); c.rotate(p.r+(p.tilt||0)+v.r); c.scale(p.flip?-1:1,1); c.drawImage(im,-w/2,-h/2,w,h); c.restore(); }
+function drawItem(c,it,p,t=0){ const im=imgs.get(it.assetId); if(!im) return; let w=im.naturalWidth*p.s,h=im.naturalHeight*p.s; const v=animAt(it,h,t); w*=v.s; h*=v.s; c.save(); c.translate(p.x+v.x,p.y+v.y);
+  if(v.feet){ c.rotate(p.r+(p.tilt||0)); c.scale(p.flip?-1:1,1); c.translate(0,h/2); c.rotate(v.r); c.scale(1,v.sy); c.translate(0,-h/2); }
+  else { c.rotate(p.r+(p.tilt||0)+v.r); c.scale(p.flip?-1:1,1); }
+  c.drawImage(im,-w/2,-h/2,w,h); c.restore(); }
 function drawScene(c,scene,poseOf,t=0){ c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); drawBackdrop(c,scene.backdrop); for(const it of scene.items) drawItem(c,it,poseOf(it),t); c.restore(); }
 const loopOn=it=>!!(it.loop&&it.loop.on);
 function loopPose(it,t){ if(!loopOn(it)) return it; const F=it.loop.frames,D=it.loop.dur,T=((t%D)+D)%D; let a=0,b=F.length-1; while(b-a>1){ const m=(a+b)>>1; if(F[m][0]<=T) a=m; else b=m; } const A=F[a],B=F[b],k=clamp((T-A[0])/((B[0]-A[0])||1),0,1),L=i=>A[i]+(B[i]-A[i])*k;
@@ -179,7 +182,7 @@ async function startRecording(layer){
   voiceWanted=$('voiceOn').checked; micOK=false;
   if(voiceWanted){ await micOn(); micOK=!!Sound.mic.stream; if(!micOK) toast("The microphone isn't available, so this recording has no voice."); }
   mode='count'; setLive(true); $('countdown').hidden=false;
-  const buf=await preload(scene);
+  const buf=await preload(scene); for(const r of project.pads) Sound.buffer(r,project.assets).catch(()=>{});
   for(const n of [3,2,1]){ $('countdown').textContent=n; await new Promise(r=>setTimeout(r,700)); }
   $('countdown').hidden=true; beginTake(scene,layer,buf);
 }
@@ -284,22 +287,43 @@ function fillSelect(sel,builtin,prefix,val){ sel.innerHTML=''; const o=(v,t)=>{ 
 function renderSoundTab(){ const s=cur(); fillSelect($('ambSel'),Sound.AMBIENCE,'syn',s.ambience); fillSelect($('musSel'),Sound.MUSIC,'mus',s.music);
   const m=project.mix; $('mixVoice').value=m.voice; $('mixAmb').value=m.ambience; $('mixMus').value=m.music; $('mixFx').value=m.fx; renderPads(); }
 function padName(r){ const a=project.assets[r.slice(6)]; return a?a.name:'?'; }
-function renderPads(){ const box=$('padRow'); box.innerHTML=''; (project.pads||[]).forEach(r=>{ const b=document.createElement('button'); b.className='pad'; b.textContent='🔊 '+padName(r); b.onpointerdown=e=>{ e.preventDefault(); hitPad(r); }; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); hitPad(r); } }; box.append(b); }); box.hidden=!project.pads.length||mode==='play'; document.querySelectorAll('#sfxLib input').forEach(c=>{ c.checked=project.pads.includes(refForLib(c.value)); }); resize(); }
+function renderPads(){ const box=$('padRow'); box.innerHTML=''; renderPadList(); (project.pads||[]).forEach((r,i)=>{ const b=document.createElement('button'); b.className='pad'; b.innerHTML=(i<9?`<kbd>${i+1}</kbd> `:'')+(isMine(r)?'🎤 ':'🔊 '); b.append(padName(r)); b.onpointerdown=e=>{ e.preventDefault(); hitPad(r); }; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); hitPad(r); } }; box.append(b); }); box.hidden=!project.pads.length||mode==='play'; document.querySelectorAll('#sfxLib input').forEach(c=>{ c.checked=project.pads.includes(refForLib(c.value)); }); resize(); }
 const refForLib=path=>{ const id=Object.keys(project.assets).find(k=>project.assets[k].libPath===path); return id?'asset:'+id:''; };
-async function hitPad(r){ const c=Sound.audioCtx(); try{ const b=await Sound.buffer(r,project.assets); if(!b) return; const s=c.createBufferSource(),g=c.createGain(); s.buffer=b; g.gain.value=project.mix.fx; s.connect(g); g.connect(Sound.master(c)); s.start(); if(mode==='rec'&&rec) rec.fx.push({t:r3(recTime()),ref:r}); }catch(e){ toast("That sound couldn't be played."); } }
+const isMine=r=>{ const a=project.assets[r.slice(6)]; return !!(a&&a.mine); };
+function renderPadList(){ const box=$('padList'); if(!box) return; box.innerHTML=''; $('padListHead').hidden=!project.pads.length; project.pads.forEach((r,i)=>{ const row=document.createElement('div'); row.className='padItem'; const n=document.createElement('span'); n.textContent=(i<9?(i+1)+'. ':'')+(isMine(r)?'🎤 ':'')+padName(r); const pl=document.createElement('button'); pl.className='small'; pl.textContent='▶'; pl.setAttribute('aria-label','Play '+padName(r)); pl.onclick=()=>hitPad(r); const d=document.createElement('button'); d.className='small'; d.textContent='🗑'; d.setAttribute('aria-label','Remove '+padName(r)); d.onclick=()=>{ checkpoint(); project.pads=project.pads.filter(x=>x!==r); renderPads(); dirty(); }; row.append(n,pl,d); box.append(row); }); }
+async function hitPad(r){ const c=Sound.audioCtx(),at=mode==='rec'&&rec?recTime():null; try{ const b=await Sound.buffer(r,project.assets); if(!b) return; const s=c.createBufferSource(),g=c.createGain(); s.buffer=b; g.gain.value=project.mix.fx; s.connect(g); g.connect(Sound.master(c)); s.start(); if(at!==null&&mode==='rec'&&rec) rec.fx.push({t:r3(at),ref:r}); }catch(e){ toast("That sound couldn't be played."); } }
 async function libRef(path,nm){ let r=refForLib(path); if(r) return r; const q=await fetch('sounds/'+path.split('/').map(encodeURIComponent).join('/')); if(!q.ok) throw 0; const blob=await q.blob(),a=addAsset('audio',blob,nm||path.split('/').pop().replace(/\.[^.]+$/,'')); a.libPath=path; return 'asset:'+a.id; }
 async function renderLibrary(){ const box=$('sfxLib'); if(box.dataset.done) return; box.dataset.done=1;
   try{ const m=await (await fetch('sounds/manifest.json')).json(); for(const cat in m){ const d=document.createElement('details'),s=document.createElement('summary'); s.textContent=cat==='Other'?'More':cat; d.append(s); const w=document.createElement('div'); w.className='libItems'; for(const path of m[cat]){ const nm=path.split('/').pop().replace(/\.[^.]+$/,''),l=document.createElement('label'); l.className='check'; const c=document.createElement('input'); c.type='checkbox'; c.value=path; l.append(c,' '+nm); c.onchange=async()=>{ try{ checkpoint(); if(c.checked){ const r=await libRef(path,nm); if(!project.pads.includes(r)) project.pads.push(r); hitPad(r); } else project.pads=project.pads.filter(x=>x!==refForLib(path)); renderPads(); dirty(); }catch(_){ toast("That sound couldn't be loaded."); c.checked=false; } }; w.append(l); } d.append(w); box.append(d); } renderPads(); }
   catch(_){ box.innerHTML='<p class="hint">The sound list needs a connection.</p>'; } }
 function drawThumb(c,s){ const g=c.getContext('2d'); g.setTransform(c.width/W,0,0,c.height/H,0,0); drawScene(g,s,it=>it); }
-function renderScenes(){ const box=$('sceneList'),keep=box.scrollLeft; box.innerHTML=''; project.scenes.forEach((s,i)=>{ const b=document.createElement('button'); b.className='scene'+(s.id===(playing?playing.scene.id:curId)?' on':''); b.setAttribute('aria-label','Scene '+(i+1)+(s.take?', recorded':''));
+function renderScenes(){ const box=$('sceneList'),keep=box.scrollLeft; box.innerHTML=''; project.scenes.forEach((s,i)=>{ const on=s.id===(playing?playing.scene.id:curId),b=document.createElement('button'); b.className='scene'+(on?' on':''); b.dataset.id=s.id; b.title='Hold and drag to move'; b.setAttribute('aria-label','Scene '+(i+1)+(s.take?', recorded':'')+'. Shift and arrow keys move it.');
     const c=document.createElement('canvas'); c.width=186;c.height=105; drawThumb(c,s); b.append(c); const n=document.createElement('span'); n.className='num'; n.textContent=i+1; b.append(n);
     if(s.take){ const t=document.createElement('span'); t.className='tick'; t.textContent=fmt(s.take.dur); b.append(t); }
-    b.onclick=()=>{ if(mode!=='setup') return; curId=s.id; selId=null; refreshAll(); };
+    if(on&&mode==='setup'){ const x=document.createElement('span'); x.className='trash'; x.textContent='🗑'; x.setAttribute('role','button'); x.setAttribute('aria-label','Delete scene '+(i+1)); x.onpointerdown=e=>e.stopPropagation(); x.onclick=e=>{ e.stopPropagation(); deleteScene(); }; b.append(x); }
+    b.onclick=()=>{ if(mode!=='setup'||sceneDragged) return; curId=s.id; selId=null; refreshAll(); };
+    b.addEventListener('pointerdown',e=>sceneDown(e,b)); b.oncontextmenu=e=>e.preventDefault();
+    b.onkeydown=e=>{ if(mode!=='setup') return; if(e.shiftKey&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){ e.preventDefault(); e.stopPropagation(); curId=s.id; moveScene(e.key==='ArrowLeft'?-1:1); $('sceneList').querySelector('.scene.on')?.focus(); } else if(e.key==='Delete'){ e.preventDefault(); e.stopPropagation(); curId=s.id; deleteScene(); } };
     box.append(b); });
-  const add=document.createElement('button'); add.id='addScene'; add.textContent='＋'; add.title='Add a scene'; add.setAttribute('aria-label','Add a scene'); add.onclick=addScene; box.append(add);
   const con=document.createElement('button'); con.id='contScene'; con.innerHTML='<span aria-hidden="true">➡</span> Continue story'; con.title='New scene that starts where the selected scene finishes, with the same cutouts, backdrop and sounds'; con.disabled=!cur().items.length; con.onclick=continueStory; box.append(con);
-  box.scrollLeft=keep; $('moveL').disabled=project.scenes[0]===cur(); $('moveR').disabled=project.scenes[project.scenes.length-1]===cur(); }
+  const add=document.createElement('button'); add.id='addScene'; add.innerHTML='<span class="plus" aria-hidden="true">＋</span> Blank'; add.title='Add a new blank scene'; add.setAttribute('aria-label','Add a blank scene'); add.onclick=addScene; box.append(add);
+  box.scrollLeft=keep; }
+function moveScene(d){ const i=project.scenes.indexOf(cur()),j=i+d; if(j<0||j>=project.scenes.length) return; checkpoint(); const [m]=project.scenes.splice(i,1); project.scenes.splice(j,0,m); renderScenes(); dirty(); }
+async function deleteScene(){ if(mode!=='setup') return; if(project.scenes.length<2){ toast('A story needs at least one scene.'); return; } const s=cur(); if((s.take||s.items.length)&&!await ask('Delete scene '+(project.scenes.indexOf(s)+1)+'?',(s.take?'Its recording goes too. ':'')+'You can Undo.',[['Keep it',null],['Delete',1,'danger']])) return; checkpoint(); const i=project.scenes.indexOf(s); project.scenes.splice(i,1); curId=project.scenes[Math.max(0,i-1)].id; selId=null; refreshAll(); dirty(); }
+/* Reorder scenes by dragging: mouse drags straight away; touch needs a short hold, so a swipe still scrolls the strip. */
+let sd=null,sceneDragged=false;
+function sceneDown(e,b){ if(mode!=='setup'||e.button>0) return; sd={b,id:e.pointerId,x:e.clientX,y:e.clientY,on:false,touch:e.pointerType!=='mouse'}; if(sd.touch) sd.timer=setTimeout(()=>{ if(sd&&!sd.on) liftScene(); },380); }
+function liftScene(){ sd.on=true; sd.b.classList.add('lifted'); try{ sd.b.setPointerCapture(sd.id); }catch(_){} try{ navigator.vibrate&&navigator.vibrate(15); }catch(_){} }
+window.addEventListener('pointermove',e=>{ if(!sd||e.pointerId!==sd.id) return; const box=$('sceneList');
+  if(!sd.on){ if(Math.hypot(e.clientX-sd.x,e.clientY-sd.y)<8) return; if(sd.touch){ clearTimeout(sd.timer); sd=null; return; } liftScene(); }
+  const others=[...box.querySelectorAll('.scene')].filter(o=>o!==sd.b), before=others.find(o=>{ const r=o.getBoundingClientRect(); return e.clientX<r.left+r.width/2; })||$('contScene');
+  if(sd.b.nextSibling!==before) box.insertBefore(sd.b,before);
+  const r=box.getBoundingClientRect(); if(e.clientX<r.left+40) box.scrollLeft-=14; else if(e.clientX>r.right-40) box.scrollLeft+=14; });
+const sceneUp=e=>{ if(!sd||e.pointerId!==sd.id) return; clearTimeout(sd.timer); const was=sd; sd=null; if(!was.on) return; was.b.classList.remove('lifted');
+  const order=[...$('sceneList').querySelectorAll('.scene')].map(o=>o.dataset.id); sceneDragged=true; setTimeout(()=>sceneDragged=false,50);
+  if(order.join()!==project.scenes.map(s=>s.id).join()){ checkpoint(); project.scenes.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id)); dirty(); } curId=was.b.dataset.id; selId=null; refreshAll(); };
+window.addEventListener('pointerup',sceneUp); window.addEventListener('pointercancel',sceneUp);
+$('sceneList').addEventListener('touchmove',e=>{ if(sd&&sd.on) e.preventDefault(); },{passive:false});
 function showCurrentScene(){ const on=$('sceneList').querySelector('.scene.on'); if(on) on.scrollIntoView({block:'nearest',inline:'nearest'}); }
 function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?prev.take.dur:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:uid(),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
 function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
@@ -314,7 +338,7 @@ function saveDownload(blob,name){ const a=document.createElement('a'); a.href=UR
 function usedAssets(){ const u=new Set([...project.cast,...project.backdrops]); const ref=r=>{ if(r&&r.startsWith('asset:')) u.add(r.slice(6)); }; project.pads.forEach(ref);
   for(const s of project.scenes){ if(s.backdrop.type==='asset') u.add(s.backdrop.id); ref(s.ambience); ref(s.music); s.items.forEach(i=>u.add(i.assetId)); if(s.script) u.add(s.script); if(s.take){ (s.take.voices||[]).forEach(v=>u.add(v.assetId)); (s.take.fx||[]).forEach(f=>ref(f.ref)); } } return u; }
 async function saveProject(){ toast('Saving…',60000); const z=new JSZip(),meta={},used=usedAssets();
-  for(const id of used){ const a=project.assets[id]; if(!a) continue; const file='assets/'+id+'.'+extOf(a.blob); z.file(file,a.blob); meta[id]={id,libId:a.libId,kind:a.kind,name:a.name,w:a.w,h:a.h,file,type:a.blob.type,libPath:a.libPath,userSound:a.userSound}; }
+  for(const id of used){ const a=project.assets[id]; if(!a) continue; const file='assets/'+id+'.'+extOf(a.blob); z.file(file,a.blob); meta[id]={id,mine:a.mine,libId:a.libId,kind:a.kind,name:a.name,w:a.w,h:a.h,file,type:a.blob.type,libPath:a.libPath,userSound:a.userSound}; }
   const {assets,...rest}=project; z.file('project.json',JSON.stringify({app:'cutout-animator',...rest,assets:meta}));
   const blob=await z.generateAsync({type:'blob',compression:'STORE'}); const d=new Date(),st=d.toISOString().slice(0,10)+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
   saveDownload(blob,safeName()+'_'+st+'.cutz'); toast('Project saved to your downloads. Open it here any time to keep editing.'); }
@@ -395,6 +419,17 @@ async function downloadZip(){ const z=new JSZip(); expResults.forEach(r=>z.file(
 async function addWords(){ const t=await ask('Add words','Type a title, a label or a speech bubble.',[['Cancel',null],['Add','__input','primary']],''); if(!t||!t.trim()) return; const txt=t.trim().slice(0,80),lines=txt.split('\n'),fs=96,c=document.createElement('canvas'),g=c.getContext('2d'),font=`800 ${fs}px ui-rounded,"Trebuchet MS",sans-serif`; g.font=font; const w=Math.ceil(g.measureText(txt).width)+56,h=fs+60; c.width=w;c.height=h; g.font=font; g.textBaseline='middle'; g.textAlign='center'; g.lineJoin='round'; g.lineWidth=18; g.strokeStyle='#fff'; g.strokeText(txt,w/2,h/2); g.fillStyle='#2a2320'; g.fillText(txt,w/2,h/2);
   const blob=await new Promise(r=>c.toBlob(r,'image/png')); checkpoint(); const a=addAsset('cutout',blob,txt,w,h); await loadImg(a); project.cast.push(a.id); const it=placeCutout(a); it.s=Math.min(1,900/w); it.y=H*.2; renderCast(); updateItemBar(); dirty(); }
 
+/* ---------- record your own sound effect ---------- */
+let sfxBlob=null,sfxTimer=0,sfxT0=0;
+function sfxState(s){ $('sfxRecGo').hidden=s==='done'; $('sfxDoneBox').hidden=s!=='done'; $('sfxRecGo').innerHTML=s==='rec'?'<span class="sq"></span> Stop':'<span class="dot"></span> Record'; $('sfxRecGo').classList.toggle('going',s==='rec'); $('sfxTime').textContent=s==='rec'?'0.0 s':''; }
+async function sfxOpen(){ if(mode!=='setup') return; sfxBlob=null; $('sfxName').value='My sound '+(project.pads.filter(isMine).length+1); sfxState('idle'); $('sfxMsg').textContent=''; $('sfxDlg').showModal();
+  try{ await Sound.micStart(micPref()); micUI(); }catch(e){ $('sfxMsg').textContent=e.name==='NotAllowedError'?'The microphone is blocked in the browser settings.':"Can't find a microphone."; } }
+function sfxStart(){ if(!Sound.mic.stream) return; Sound.audioCtx(); Sound.micCollect(); sfxT0=performance.now(); sfxState('rec'); sfxTimer=setInterval(()=>{ const s=(performance.now()-sfxT0)/1000; $('sfxTime').textContent=s.toFixed(1)+' s'; if(s>=10) sfxStop(); },100); }
+async function sfxStop(){ clearInterval(sfxTimer); const b=Sound.micTakeTrimmed(); if(!b){ sfxState('idle'); $('sfxMsg').textContent="That was too quiet. Get closer to the microphone and try again."; return; } sfxBlob=b; $('sfxMsg').textContent=''; sfxState('done'); sfxPlay(); }
+async function sfxPlay(){ if(!sfxBlob) return; const c=Sound.audioCtx(),ab=await sfxBlob.arrayBuffer(),buf=await new Promise((res,rej)=>{ const q=c.decodeAudioData(ab,res,rej); if(q&&q.catch) q.catch(rej); }).catch(()=>null); if(!buf) return; const s=c.createBufferSource(); s.buffer=buf; s.connect(Sound.master(c)); s.start(); }
+function sfxClose(){ clearInterval(sfxTimer); Sound.mic.chunks=null; $('sfxDlg').close(); if(!$('voiceOn').checked){ Sound.micStop(); micUI(); } }
+function sfxKeep(){ if(!sfxBlob) return; checkpoint(); const nm=($('sfxName').value||'My sound').trim().slice(0,30),a=addAsset('audio',sfxBlob,nm); a.mine=true; project.pads.push('asset:'+a.id); renderPads(); dirty(); sfxClose(); toast('“'+nm+'” is ready. Tap its button while recording.'); }
+
 /* ---------- template sheets ---------- */
 async function importSheets(sheets){ checkpoint();
   const blank=project.scenes.length===1&&!project.scenes[0].items.length&&!project.scenes[0].take, added=[], base=blank?0:project.scenes.length;
@@ -404,7 +439,7 @@ async function importSheets(sheets){ checkpoint();
     if(sh.script){ const a=addAsset('script',await jpg(sh.script),'Script',sh.script.width,sh.script.height); n.script=a.id; }
     n.ambience=sh.amb; n.music=sh.mus;
     for(const r of sh.fx){ try{ const ref=await libRef(r); if(!project.pads.includes(ref)) project.pads.push(ref); }catch(_){ } }
-    const count=sh.chars.length; for(let i=0;i<count;i++){ const ch=sh.chars[i],a=addAsset('cutout',ch.cut.blob,'Cutout',ch.cut.w,ch.cut.h); await loadImg(a); project.cast.push(a.id); const k=Math.min(320/a.h,300/a.w,1.6); n.items.push({id:uid(),assetId:a.id,x:W*(i+1)/(count+1),y:H*.6,s:k,r:0,flip:false,anim:ch.alive?'sway':null}); }
+    const count=sh.chars.length; for(let i=0;i<count;i++){ const ch=sh.chars[i],a=addAsset('cutout',ch.cut.blob,'Cutout',ch.cut.w,ch.cut.h); await loadImg(a); project.cast.push(a.id); const k=Math.min(320/a.h,300/a.w,1.6); n.items.push({id:uid(),assetId:a.id,x:W*(i+1)/(count+1),y:H*.6,s:k,r:0,flip:false,anim:ch.anim||null}); }
     added.push(n); }
   project.scenes=blank?added:project.scenes.concat(added); curId=added[0].id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast(sheets.length+(sheets.length===1?' scene':' scenes')+' added.'); }
 
@@ -426,8 +461,9 @@ function wire(){
   let prevStop=null,prevBtn=null; const stopPrev=()=>{ if(prevStop){ prevStop(); prevStop=null; prevBtn.textContent='▶'; } };
   const prev=(btn,get,key)=>btn.onclick=async()=>{ if(prevBtn===btn&&prevStop){ stopPrev(); return; } stopPrev(); const r=get(); if(!r) return; const c=Sound.audioCtx(),b=await Sound.buffer(r,project.assets),fake={ambience:key==='ambience'?r:null,music:key==='music'?r:null}; prevStop=Sound.schedule(c,Sound.master(c),fake,c.currentTime+.02,x=>x===r?b:null,project.mix,{dur:Infinity}); prevBtn=btn; btn.textContent='■'; };
   prev($('ambPrev'),()=>$('ambSel').value,'ambience'); prev($('musPrev'),()=>$('musSel').value,'music');
+  $('recSfx').onclick=sfxOpen; $('sfxRecGo').onclick=()=>$('sfxRecGo').classList.contains('going')?sfxStop():sfxStart(); $('sfxAgain').onclick=()=>{ sfxBlob=null; sfxState('idle'); }; $('sfxPlay').onclick=sfxPlay; $('sfxKeep').onclick=sfxKeep; $('sfxCancel').onclick=sfxClose; $('sfxDlg').addEventListener('cancel',e=>{ e.preventDefault(); sfxClose(); });
   $('uploadSound').onclick=()=>$('soundInput').click();
-  $('soundInput').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; const nm=f.name.replace(/\.[^.]+$/,''); const a=addAsset('audio',f.slice(0,f.size,f.type||'audio/mpeg'),nm); a.userSound=true; try{ await Sound.buffer('asset:'+a.id,project.assets); }catch(_){ delete project.assets[a.id]; toast("That sound file couldn't be opened."); return; } const c=await ask('Use “'+nm+'” as…','',[['Background sound','amb'],['Music','mus']]); if(!c) return; checkpoint(); const ref='asset:'+a.id; if(c==='amb') cur().ambience=ref; if(c==='mus') cur().music=ref; renderSoundTab(); dirty(); };
+  $('soundInput').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; const nm=f.name.replace(/\.[^.]+$/,''); const a=addAsset('audio',f.slice(0,f.size,f.type||'audio/mpeg'),nm); a.userSound=true; try{ await Sound.buffer('asset:'+a.id,project.assets); }catch(_){ delete project.assets[a.id]; toast("That sound file couldn't be opened."); return; } const c=await ask('Use “'+nm+'” as…','',[['Background sound','amb'],['Music','mus'],['Sound effect button','pad']]); if(!c) return; checkpoint(); const ref='asset:'+a.id; if(c==='amb') cur().ambience=ref; if(c==='mus') cur().music=ref; if(c==='pad'){ a.mine=true; project.pads.push(ref); } renderSoundTab(); dirty(); };
   const mx=(id,key)=>{ $(id).oninput=e=>{ project.mix[key]=+e.target.value; dirty(); }; }; mx('mixVoice','voice'); mx('mixAmb','ambience'); mx('mixMus','music'); mx('mixFx','fx');
   $('micEnable').onclick=micOn;
   $('voiceOn').onchange=e=>{ if(e.target.checked) micOn(); else { Sound.micStop(); micUI(); } };
@@ -447,8 +483,6 @@ function wire(){
   $('itDup').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); const n={...it,id:uid(),x:it.x+40,y:it.y+30}; cur().items.push(n); selId=n.id; dirty(); };
   const removeSel=()=>{ const it=sel(); if(!it) return; checkpoint(); const s=cur(); s.items=s.items.filter(x=>x.id!==it.id); if(s.take) delete s.take.tracks[it.id]; selId=null; updateItemBar(); refreshHint(); dirty(); };
   $('itDel').onclick=removeSel;
-  const moveScene=d=>{ const i=project.scenes.indexOf(cur()),j=i+d; if(j<0||j>=project.scenes.length) return; checkpoint(); const [m]=project.scenes.splice(i,1); project.scenes.splice(j,0,m); renderScenes(); dirty(); }; $('moveL').onclick=()=>moveScene(-1); $('moveR').onclick=()=>moveScene(1);
-  $('delScene').onclick=async()=>{ if(project.scenes.length<2){ toast('A project needs at least one scene.'); return; } if(cur().take&&!await ask('Delete this scene?','Its recording goes too. You can Undo.',[['Keep it',null],['Delete',1,'danger']])) return; checkpoint(); const i=project.scenes.indexOf(cur()); project.scenes.splice(i,1); curId=project.scenes[Math.max(0,i-1)].id; selId=null; refreshAll(); dirty(); };
   $('undoBtn').onclick=undo; $('redoBtn').onclick=redo;
   $('newBtn').onclick=async()=>{ $('menuDlg').close(); if(!await ask('Start a new project?','Anything you have not saved as a project file will be lost.',[['Cancel',null],['Start new',1,'danger']])) return; await adopt(newProject()); undoStack=[]; redoStack=[]; refreshAll(); autosave(); };
   $('saveBtn').onclick=saveProject; $('openBtn').onclick=()=>{ $('menuDlg').close(); $('openInput').click(); }; $('openInput').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) openProject(f); };
@@ -461,6 +495,7 @@ function wire(){
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){ e.preventDefault(); saveProject(); return; } if(e.ctrlKey||e.metaKey) return;
     if(e.key==='Escape'){ if(mode==='rec') stopRecording(); if(mode==='play') stopPlay(); return; }
     if(mode==='setup'&&(e.key==='r'||e.key==='R')){ startRecording(false); return; }
+    if(/^[1-9]$/.test(e.key)&&(mode==='rec'||mode==='setup')){ const r=project.pads[+e.key-1]; if(r) hitPad(r); return; }
     if(mode!=='setup'&&mode!=='rec') return;
     if(e.key==='Tab'&&document.activeElement===cv){ const it=cur().items; if(it.length){ e.preventDefault(); const i=it.findIndex(x=>x.id===selId); selId=it[(i+(e.shiftKey?-1:1)+it.length)%it.length].id; updateItemBar(); } return; }
     const it=sel(); if(!it) return; const st=e.shiftKey?40:10; let done=true; const once=()=>{ if(mode==='setup'&&!e.repeat) checkpoint(); return target(it); };

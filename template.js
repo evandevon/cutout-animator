@@ -1,16 +1,19 @@
 'use strict';
 /* Printable template sheets: find the corner squares, straighten the page, pull out each box.
-   Measurements are millimetres on a landscape A4 sheet. A3 is the same layout scaled up.
+   Measurements are millimetres on a landscape A4 sheet. Printing it larger (e.g. A3) works the same.
    tools/make_templates.py draws the PDFs from these same numbers. */
 const Template=(()=>{
   const $=id=>document.getElementById(id);
   const L={W:297,H:210,marks:[[13,13],[284,13],[284,197],[13,197]],
     bg:{x:10,y:22,w:160,h:90},script:{x:10,y:118,w:160,h:70},
     chars:[{x:176,y:22,w:53,h:38},{x:234,y:22,w:53,h:38},{x:176,y:72,w:53,h:38},{x:234,y:72,w:53,h:38}],
-    tickSize:6,aliveDy:39.5,cols:[176,213,250],rowY:i=>128+i*9.5};
+    tickSize:6,animDy:39.5,animSize:5,animDx:[0,13.5,27,40.5],cols:[176,213,250],rowY:i=>128+i*9.5};
   const AMB=[['syn:rain','Rain'],['syn:wind','Wind'],['syn:ocean','Ocean'],['syn:forest','Forest']];
   const MUS=[['mus:happy','Happy'],['mus:adventure','Adventure'],['mus:spooky','Spooky'],['mus:sleepy','Sleepy']];
   const FX=[['Classic Cartoon/Spring Bounce 1.mp3','Boing'],['Classic Cartoon/Bam.mp3','Bam'],['Classic Cartoon/Pop 1.mp3','Pop'],['Classic Cartoon/Knock on Door.mp3','Knock'],['Classic Cartoon/Explosion 1.mp3','Explosion'],['Classic Cartoon/Zip In and Zip Out.mp3','Zip']];
+  const ANIM=[['sway','Sway'],['hop','Hop'],['float','Float'],['spin','Spin']];
+  // Blank paper between the boxes: used to measure the lighting across the page, so shadows and warm light can be evened out.
+  const PAPER=[]; for(let y=30;y<=185;y+=15){ PAPER.push([5,y],[292,y],[173,y]); } for(let y=26;y<=58;y+=8) PAPER.push([231.5,y],[231.5,y+50]); for(let y=132;y<=176;y+=11) PAPER.push([209.5,y],[246,y]); for(let x=30;x<=270;x+=20) PAPER.push([x,191]);
   const INSET=2, DETECT_EDGE=1000, WORK_EDGE=2200, PX_MM=6;
 
   /* ---- finding the page ---- */
@@ -47,12 +50,20 @@ const Template=(()=>{
     for(let i=0;i<8;i++){ let p=i; for(let r=i+1;r<8;r++) if(Math.abs(A[r][i])>Math.abs(A[p][i])) p=r; [A[i],A[p]]=[A[p],A[i]]; const f=A[i][i]; if(!f) return null; for(let c=i;c<9;c++) A[i][c]/=f; for(let r=0;r<8;r++) if(r!==i){ const m=A[r][i]; if(m) for(let c=i;c<9;c++) A[r][c]-=m*A[i][c]; } }
     return [A[0][8],A[1][8],A[2][8],A[3][8],A[4][8],A[5][8],A[6][8],A[7][8],1];
   }
-  function warp(src,sw,sh,H,b,pxmm){ // bilinear sample of one box, straightened
+  function lightField(src,sw,sh,H){ // fit a smooth curved surface per colour channel to the paper samples
+    const pts=[]; for(const [x,y] of PAPER){ const c=warp(src,sw,sh,H,{x:x-1.5,y:y-1.5,w:3,h:3},4,null),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,ch=[[],[],[]]; for(let q=0;q<d.length;q+=4) for(let k=0;k<3;k++) ch[k].push(d[q+k]); pts.push([x/297,y/210,...ch.map(a=>{ a.sort((m,n)=>m-n); return a[Math.floor(a.length*.75)]; })]); }
+    const basis=(u,v)=>[1,u,v,u*u,u*v,v*v],coef=[];
+    for(let k=0;k<3;k++){ const A=Array.from({length:6},()=>new Array(7).fill(0)); for(const p of pts){ const b=basis(p[0],p[1]); for(let i=0;i<6;i++){ for(let j=0;j<6;j++) A[i][j]+=b[i]*b[j]; A[i][6]+=b[i]*p[2+k]; } }
+      for(let i=0;i<6;i++) A[i][i]+=1e-6; for(let i=0;i<6;i++){ let pv=i; for(let r=i+1;r<6;r++) if(Math.abs(A[r][i])>Math.abs(A[pv][i])) pv=r; [A[i],A[pv]]=[A[pv],A[i]]; const f=A[i][i]; for(let c=i;c<7;c++) A[i][c]/=f; for(let r=0;r<6;r++) if(r!==i){ const m=A[r][i]; for(let c=i;c<7;c++) A[r][c]-=m*A[i][c]; } }
+      coef.push(A.map(r=>r[6])); }
+    return (mx,my)=>{ const b=basis(mx/297,my/210); return coef.map(cf=>{ let v=0; for(let i=0;i<6;i++) v+=cf[i]*b[i]; return 250/Math.max(40,Math.min(255,v)); }); };
+  }
+  function warp(src,sw,sh,H,b,pxmm,light){ // bilinear sample of one box, straightened
     const w=Math.round(b.w*pxmm),h=Math.round(b.h*pxmm),c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d'),o=g.createImageData(w,h),out=o.data;
     for(let j=0,q=0;j<h;j++){ const my=b.y+(j+.5)/pxmm; for(let i=0;i<w;i++,q+=4){ const mx=b.x+(i+.5)/pxmm,z=H[6]*mx+H[7]*my+1,u=(H[0]*mx+H[1]*my+H[2])/z,v=(H[3]*mx+H[4]*my+H[5])/z,x0=u|0,y0=v|0;
         if(x0<0||y0<0||x0>=sw-1||y0>=sh-1){ out[q]=out[q+1]=out[q+2]=255; out[q+3]=255; continue; }
         const fx=u-x0,fy=v-y0,p=(y0*sw+x0)*4,a=(1-fx)*(1-fy),bb=fx*(1-fy),cc=(1-fx)*fy,dd=fx*fy;
-        for(let k=0;k<3;k++) out[q+k]=src[p+k]*a+src[p+4+k]*bb+src[p+sw*4+k]*cc+src[p+sw*4+4+k]*dd; out[q+3]=255; } }
+        const g=light?light(mx,my):null; for(let k=0;k<3;k++){ const v=src[p+k]*a+src[p+4+k]*bb+src[p+sw*4+k]*cc+src[p+sw*4+4+k]*dd; out[q+k]=g?v*g[k]:v; } out[q+3]=255; } }
     g.putImageData(o,0,0); return c;
   }
   const inset=b=>({x:b.x+INSET,y:b.y+INSET,w:b.w-INSET*2,h:b.h-INSET*2});
@@ -63,12 +74,13 @@ const Template=(()=>{
   async function processCanvas(cv,name){
     const f=detect(cv); if(!f) return {name,error:"Couldn't find the four corner squares"};
     const sw=cv.width,sh=cv.height,src=cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,sw,sh).data,H=homography(L.marks,f.pts); if(!H) return {name,error:'The page is too skewed'};
-    const tick=(x,y)=>{ const s=L.tickSize,c=warp(src,sw,sh,H,{x:x+1.2,y:y+1.2,w:s-2.4,h:s-2.4},8); return inked(c,f.paper)>.16; };
+    const light=lightField(src,sw,sh,H),P=250;
+    const tick=(x,y,s=L.tickSize)=>{ const c=warp(src,sw,sh,H,{x:x+1.1,y:y+1.1,w:s-2.2,h:s-2.2},8,light); return inked(c,P)>.16; };
     const pickOne=(list,col)=>{ const i=list.findIndex((_,n)=>tick(L.cols[col],L.rowY(n))); return i<0?null:list[i][0]; };
-    const bgC=warp(src,sw,sh,H,inset(L.bg),10),scriptC=warp(src,sw,sh,H,inset(L.script),9);
+    const bgC=warp(src,sw,sh,H,inset(L.bg),10,light),scriptC=warp(src,sw,sh,H,inset(L.script),9,light);
     const sheet={name,amb:pickOne(AMB,0),mus:pickOne(MUS,1),fx:FX.filter((_,n)=>tick(L.cols[2],L.rowY(n))).map(x=>x[0]),chars:[],
-      bg:inked(bgC,f.paper)>.01?whiten(bgC,f.paper):null,script:inked(scriptC,f.paper)>.003?whiten(scriptC,f.paper):null};
-    for(const b of L.chars){ const c=warp(src,sw,sh,H,inset(b),PX_MM*1.4),cut=await Cut.autoCut(c); if(cut) sheet.chars.push({raw:c,cut,alive:tick(b.x,b.y+L.aliveDy)}); }
+      bg:inked(bgC,P)>.004?bgC:null,script:inked(scriptC,P)>.003?scriptC:null};
+    for(const b of L.chars){ const c=warp(src,sw,sh,H,inset(b),PX_MM*1.4,light),cut=await Cut.autoCut(c); if(cut){ const k=L.animDx.findIndex(dx=>tick(b.x+dx,b.y+L.animDy,L.animSize)); sheet.chars.push({raw:c,cut,anim:k<0?null:ANIM[k][0]}); } }
     if(!sheet.bg&&!sheet.script&&!sheet.chars.length) sheet.error='This sheet looks blank';
     return sheet;
   }
@@ -104,7 +116,7 @@ const Template=(()=>{
     const fig=(cap,el)=>{ const f=document.createElement('figure'); f.append(el); const c=document.createElement('figcaption'); c.textContent=cap; f.append(c); w.append(f); return f; };
     if(s.bg) fig('Backdrop',canvasThumb(s.bg)); else { const e=document.createElement('div'); e.className='tplNone'; e.textContent='none'; fig('Backdrop',e); }
     s.chars.forEach((ch,i)=>{ const btn=document.createElement('button'); btn.className='thumb'; btn.title='Tap to fix this cutout'; btn.setAttribute('aria-label','Fix character '+(i+1)); const im=new Image(); im.alt=''; im.src=URL.createObjectURL(ch.cut.blob); btn.append(im);
-      btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); }); const cap=ch.alive?'Alive':'Object'; fig(cap,btn); });
+      btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); }); const cap=ch.anim?ANIM.find(a=>a[0]===ch.anim)[1]:'Still'; fig(cap,btn); });
     if(s.script) fig('Script',canvasThumb(s.script,'wideimg'));
     row.append(w);
     const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); if(s.fx.length) parts.push('Effects: '+s.fx.map(r=>labelOf(FX,r)).join(', ')); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);
@@ -127,5 +139,5 @@ const Template=(()=>{
     const d=$('tplDlg'); d.addEventListener('dragover',e=>e.preventDefault()); d.addEventListener('drop',e=>{ e.preventDefault(); const f=[...e.dataTransfer.files]; if(f.length) addFiles(f); });
     d.addEventListener('keydown',e=>{ if(e.code==='Space'&&stream&&!$('capDlg').open&&e.target.tagName!=='BUTTON'){ e.preventDefault(); snap(); } });
   }
-  return {init,open,L,AMB,MUS,FX,detect,processCanvas};
+  return {init,open,L,AMB,MUS,FX,ANIM,detect,processCanvas};
 })();

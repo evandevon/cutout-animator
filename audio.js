@@ -145,6 +145,17 @@ const Sound = (() => {
     const ch=mic.chunks; mic.chunks=null; if(!ch||!ch.length) return null;
     const n=ch.reduce((a,b)=>a+b.length,0); return wav(ch,n,audioCtx().sampleRate);
   }
+  // For recorded sound effects: cut the silence before and after, keeping a little breathing room.
+  function micTakeTrimmed(){
+    const ch=mic.chunks; mic.chunks=null; if(!ch||!ch.length) return null;
+    const n=ch.reduce((x,y)=>x+y.length,0),all=new Float32Array(n); let o=0; for(const c of ch){ all.set(c,o); o+=c.length; }
+    const sr=audioCtx().sampleRate,win=Math.round(sr*.01); let peak=0; for(let i=0;i<n;i++) peak=Math.max(peak,Math.abs(all[i])); if(peak<.03) return null;
+    const lim=Math.max(.015,peak*.08),loud=i=>{ for(let j=i;j<Math.min(n,i+win);j++) if(Math.abs(all[j])>lim) return true; return false; };
+    let s=0; while(s<n&&!loud(s)) s+=win; let e=n-win; while(e>s&&!loud(e)) e-=win;
+    s=Math.max(0,s-Math.round(sr*.06)); e=Math.min(n,e+win+Math.round(sr*.15)); const cut=all.slice(s,e),fade=Math.min(cut.length,Math.round(sr*.01));
+    for(let i=0;i<fade;i++){ cut[i]*=i/fade; cut[cut.length-1-i]*=i/fade; }
+    return wav([cut],cut.length,sr);
+  }
   function micStop(){
     if(mic.stream) mic.stream.getTracks().forEach(t=>t.stop());
     try{ mic.src&&mic.src.disconnect(); mic.node&&mic.node.disconnect(); mic.sink&&mic.sink.disconnect(); }catch(_){}
@@ -157,5 +168,5 @@ const Sound = (() => {
     let o=44; for(const c of chunks) for(let i=0;i<c.length;i++,o+=2){ const s=Math.max(-1,Math.min(1,c[i])); v.setInt16(o,s<0?s*32768:s*32767,true); }
     return new Blob([b],{type:'audio/wav'});
   }
-  return {master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micCollect,micTake,micStop};
+  return {master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micCollect,micTake,micTakeTrimmed,micStop};
 })();
