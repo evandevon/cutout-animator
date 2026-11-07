@@ -67,6 +67,12 @@ const Template=(()=>{
     g.putImageData(o,0,0); return c;
   }
   const inset=b=>({x:b.x+INSET,y:b.y+INSET,w:b.w-INSET*2,h:b.h-INSET*2});
+  function unprint(c,x,y,w,h,pm){ // whiten the printed grey box border, but not children's ink drawn over it
+    const g=c.getContext('2d',{willReadFrequently:true}),o=g.getImageData(0,0,c.width,c.height),d=o.data,W=c.width,band=.8*pm;
+    for(let j=0;j<c.height;j++)for(let i=0;i<W;i++){ const near=(Math.abs(i-x)<band||Math.abs(i-x-w)<band)&&j>y-band&&j<y+h+band||(Math.abs(j-y)<band||Math.abs(j-y-h)<band)&&i>x-band&&i<x+w+band; if(!near) continue;
+      const q=(j*W+i)*4,mx=Math.max(d[q],d[q+1],d[q+2]),mn=Math.min(d[q],d[q+1],d[q+2]); if(mx-mn<28&&mn>140) d[q]=d[q+1]=d[q+2]=250; }
+    g.putImageData(o,0,0);
+  }
   function inked(c,paper){ const d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,c.width,c.height).data; let n=0; const lim=paper*.78; for(let q=0;q<d.length;q+=4){ const mx=Math.max(d[q],d[q+1],d[q+2]),mn=Math.min(d[q],d[q+1],d[q+2]); if((d[q]+d[q+1]+d[q+2])/3<lim||mx-mn>40) n++; } return n/(d.length/4); }
   function whiten(c,paper){ const g=Math.min(1.6,Math.max(1,250/paper)); if(g<=1.01) return c; const x=c.getContext('2d'),o=x.getImageData(0,0,c.width,c.height),d=o.data; for(let q=0;q<d.length;q+=4){ d[q]*=g;d[q+1]*=g;d[q+2]*=g; } x.putImageData(o,0,0); return c; }
 
@@ -80,7 +86,14 @@ const Template=(()=>{
     const bgC=warp(src,sw,sh,H,inset(L.bg),10,light),scriptC=warp(src,sw,sh,H,inset(L.script),9,light);
     const sheet={name,amb:pickOne(AMB,0),mus:pickOne(MUS,1),fx:FX.filter((_,n)=>tick(L.cols[2],L.rowY(n))).map(x=>x[0]),chars:[],
       bg:inked(bgC,P)>.004?bgC:null,script:inked(scriptC,P)>.003?scriptC:null};
-    for(const b of L.chars){ const c=warp(src,sw,sh,H,inset(b),PX_MM*1.4,light),cut=await Cut.autoCut(c); if(cut){ const k=L.animDx.findIndex(dx=>tick(b.x+dx,b.y+L.animDy,L.animSize)); sheet.chars.push({raw:c,cut,anim:k<0?null:ANIM[k][0]}); } }
+    for(const b of L.chars){
+      // Look a little past the box, in case the drawing goes over its edge.
+      const pm=PX_MM*1.4,M=8,big={x:Math.max(3,b.x-M),y:Math.max(3,b.y-M),w:0,h:0}; big.w=Math.min(294,b.x+b.w+M)-big.x; big.h=Math.min(207,b.y+b.h+M)-big.y;
+      const c=warp(src,sw,sh,H,big,pm,light),ib=inset(b),rect=[ib.x-big.x,ib.y-big.y,ib.x+ib.w-big.x,ib.y+ib.h-big.y].map(v=>Math.round(v*pm));
+      unprint(c,(b.x-big.x)*pm,(b.y-big.y)*pm,b.w*pm,b.h*pm,pm);
+      const tol=1.2,outer=[b.x-tol-big.x,b.y-tol-big.y,b.x+b.w+tol-big.x,b.y+b.h+tol-big.y].map(v=>Math.round(v*pm)),cut=await Cut.autoCut(c,rect,outer); if(!cut) continue;
+      let raw=c,r2=rect; if(!cut.outside){ raw=document.createElement('canvas'); const bx=[b.x-big.x,b.y-big.y].map(v=>Math.round(v*pm)); raw.width=Math.round(b.w*pm); raw.height=Math.round(b.h*pm); raw.getContext('2d').drawImage(c,-bx[0],-bx[1]); r2=[rect[0]-bx[0],rect[1]-bx[1],rect[2]-bx[0],rect[3]-bx[1]]; }
+      const k=L.animDx.findIndex(dx=>tick(b.x+dx,b.y+L.animDy,L.animSize)); sheet.chars.push({raw,rect:r2,cut,over:cut.outside,anim:k<0?null:ANIM[k][0]}); }
     if(!sheet.bg&&!sheet.script&&!sheet.chars.length) sheet.error='This sheet looks blank';
     return sheet;
   }
@@ -116,7 +129,7 @@ const Template=(()=>{
     const fig=(cap,el)=>{ const f=document.createElement('figure'); f.append(el); const c=document.createElement('figcaption'); c.textContent=cap; f.append(c); w.append(f); return f; };
     if(s.bg) fig('Backdrop',canvasThumb(s.bg)); else { const e=document.createElement('div'); e.className='tplNone'; e.textContent='none'; fig('Backdrop',e); }
     s.chars.forEach((ch,i)=>{ const btn=document.createElement('button'); btn.className='thumb'; btn.title='Tap to fix this cutout'; btn.setAttribute('aria-label','Fix character '+(i+1)); const im=new Image(); im.alt=''; im.src=URL.createObjectURL(ch.cut.blob); btn.append(im);
-      btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); }); const cap=ch.anim?ANIM.find(a=>a[0]===ch.anim)[1]:'Still'; fig(cap,btn); });
+      btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); },ch.rect); const cap=(ch.anim?ANIM.find(a=>a[0]===ch.anim)[1]:'Still')+(ch.over?' · past the box':''); const f=fig(cap,btn); if(ch.over){ f.classList.add('over'); btn.title='This drawing went past its box. Tap to check it.'; } });
     if(s.script) fig('Script',canvasThumb(s.script,'wideimg'));
     row.append(w);
     const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); if(s.fx.length) parts.push('Effects: '+s.fx.map(r=>labelOf(FX,r)).join(', ')); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);

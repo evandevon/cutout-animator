@@ -56,10 +56,22 @@ const Cut = (() => {
     return keep;
   }
 
+  /* Keep only the pieces that reach into rect [x0,y0,x1,y1]: a drawing that goes past its box comes along whole,
+     while labels, tickboxes and neighbouring drawings around it are left out (Add brings them back if wanted). */
+  function inRect(keep,w,h,r){
+    const lab=new Int32Array(w*h),ok=[false]; let id=0; const st=[];
+    for(let s=0;s<w*h;s++){ if(!keep[s]||lab[s]) continue; id++; let hit=false; st.length=0; st.push(s); lab[s]=id;
+      while(st.length){ const i=st.pop(),x=i%w,y=(i/w)|0; if(!hit&&x>=r[0]&&x<r[2]&&y>=r[1]&&y<r[3]) hit=true;
+        if(x>0&&keep[i-1]&&!lab[i-1]){lab[i-1]=id;st.push(i-1);} if(x<w-1&&keep[i+1]&&!lab[i+1]){lab[i+1]=id;st.push(i+1);}
+        if(i>=w&&keep[i-w]&&!lab[i-w]){lab[i-w]=id;st.push(i-w);} if(i<w*h-w&&keep[i+w]&&!lab[i+w]){lab[i+w]=id;st.push(i+w);} }
+      ok.push(hit); }
+    const out=new Uint8Array(w*h); for(let i=0;i<w*h;i++) if(keep[i]&&ok[lab[i]]) out[i]=1; return out;
+  }
+  let editRect=null;
   function recompute(){
     whiteGain=1;
     if(hasAlpha){ auto=new Uint8Array(W*H); for(let i=0;i<W*H;i++) auto[i]=pix[i*4+3]>128?1:0; }
-    else if($('autoPaper').checked) auto=autoMask(pix,W,H,+$('thresh').value,$('keepHoles').checked);
+    else if($('autoPaper').checked){ auto=autoMask(pix,W,H,+$('thresh').value,$('keepHoles').checked); if(editRect) auto=inRect(auto,W,H,editRect); }
     else auto=new Uint8Array(W*H).fill(1);
     $('threshWrap').style.opacity=$('holesWrap').style.opacity=$('autoPaper').checked?1:.4;
     draw();
@@ -76,7 +88,7 @@ const Cut = (() => {
     m.putImageData(d,0,0); }
     cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cv.width,cv.height);
     const sq=Math.ceil(12*view.dpr); for(let y=0;y<cv.height;y+=sq)for(let x=0;x<cv.width;x+=sq){ cx.fillStyle=((x+y)/sq)%2?'#cfe8e8':'#fff'; cx.fillRect(x,y,sq,sq); }
-    cx.globalAlpha=.38; cx.drawImage(src,0,0,cv.width,cv.height); cx.globalAlpha=1; // faint original, so you can see what Bring back will restore
+    cx.globalAlpha=.38; cx.drawImage(src,0,0,cv.width,cv.height); cx.globalAlpha=1; // faint original, so you can see what Add will bring back
     cx.drawImage(maskCv,0,0,cv.width,cv.height);
     if(stroke&&tool==='lasso'&&stroke.pts.length>1){ cx.beginPath(); stroke.pts.forEach((p,i)=>{ const X=p[0]*view.k,Y=p[1]*view.k; i?cx.lineTo(X,Y):cx.moveTo(X,Y); }); cx.strokeStyle='#e0301e'; cx.lineWidth=3*view.dpr; cx.setLineDash([10*view.dpr,6*view.dpr]); cx.stroke(); cx.setLineDash([]); }
     if(hover&&(tool==='erase'||tool==='restore')){ const R=+$('brush').value/2*view.dpr,X=hover[0]*view.k,Y=hover[1]*view.k; cx.beginPath(); cx.arc(X,Y,R,0,7); cx.lineWidth=3*view.dpr; cx.strokeStyle='#fff'; cx.stroke(); cx.lineWidth=1.5*view.dpr; cx.strokeStyle=tool==='erase'?'#e0301e':'#0b6e6e'; cx.setLineDash([5*view.dpr,4*view.dpr]); cx.stroke(); cx.setLineDash([]); }
@@ -115,7 +127,7 @@ const Cut = (() => {
   cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
 
   function setImage(source,sw,sh){
-    const k=Math.min(1,MAX_EDGE/Math.max(sw,sh)); W=Math.max(2,Math.round(sw*k)); H=Math.max(2,Math.round(sh*k));
+    const k=Math.min(1,MAX_EDGE/Math.max(sw,sh)); W=Math.max(2,Math.round(sw*k)); H=Math.max(2,Math.round(sh*k)); if(editRect&&k<1) editRect=editRect.map(v=>Math.round(v*k));
     src=document.createElement('canvas'); src.width=W; src.height=H;
     const g=src.getContext('2d',{willReadFrequently:true}); g.drawImage(source,0,0,W,H);
     pix=g.getImageData(0,0,W,H).data;
@@ -141,17 +153,18 @@ const Cut = (() => {
   }
 
   /* Bulk path for template sheets: no editor, default settings. */
-  async function autoCut(canvas){
-    const w=canvas.width,h=canvas.height,p=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,saved=whiteGain; let keep=autoMask(p,w,h,190,true),cnt=0; for(let i=0;i<keep.length;i++) cnt+=keep[i]; let faint=false; if(cnt<w*h*.01){ keep=autoMask(p,w,h,262,true); faint=true; } const g=whiteGain; whiteGain=saved;
+  async function autoCut(canvas,rect,outer){
+    const w=canvas.width,h=canvas.height,p=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,saved=whiteGain,R=rect||[0,0,w,h],area=(R[2]-R[0])*(R[3]-R[1]),F=k=>rect?inRect(k,w,h,rect):k; let keep=F(autoMask(p,w,h,190,true)),cnt=0; for(let i=0;i<keep.length;i++) cnt+=keep[i]; let faint=false; if(cnt<area*.01){ keep=F(autoMask(p,w,h,262,true)); faint=true; } const g=whiteGain; whiteGain=saved;
     const ink=v=>faint?Math.max(0,255-(255-v*g)*2.4):v*g; // light pencil: darken the lines so they show up on the stage
     let x0=w,y0=h,x1=-1,y1=-1,n=0; for(let y=0;y<h;y++)for(let x=0;x<w;x++) if(keep[y*w+x]){ n++; if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y; }
-    if(n<w*h*.002) return null;
+    if(n<area*.002) return null;
+    const O=outer||R,outside=!!rect&&(x0<O[0]||y0<O[1]||x1>=O[2]||y1>=O[3]);
     const cw=x1-x0+1,ch=y1-y0+1,c=document.createElement('canvas'); c.width=cw;c.height=ch; const x=c.getContext('2d'),d=x.createImageData(cw,ch);
     for(let yy=0;yy<ch;yy++)for(let xx=0;xx<cw;xx++){ const i=(yy+y0)*w+xx+x0; if(!keep[i]) continue; const q=i*4,o=(yy*cw+xx)*4; let s=0,t=0; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ const X=xx+x0+dx,Y=yy+y0+dy; if(X>=0&&Y>=0&&X<w&&Y<h){ s+=keep[Y*w+X]; t++; } } d.data[o]=ink(p[q]);d.data[o+1]=ink(p[q+1]);d.data[o+2]=ink(p[q+2]);d.data[o+3]=Math.round(255*Math.min(1,s/t*1.25)); }
-    x.putImageData(d,0,0); const blob=await new Promise(r=>c.toBlob(r,'image/png')); return {blob,w:cw,h:ch};
+    x.putImageData(d,0,0); const blob=await new Promise(r=>c.toBlob(r,'image/png')); return {blob,w:cw,h:ch,outside};
   }
   let fixDone=null;
-  function editBox(canvas,done){ fixDone=done; mode='cutout'; $('capTitle').textContent='Fix this cutout'; $('capDlg').showModal(); setImage(canvas,canvas.width,canvas.height); $('cutBackdrop').hidden=$('cutAnother').hidden=$('cutRetake').hidden=true; $('cutDone').textContent='✓ Use this cutout'; }
+  function editBox(canvas,done,rect){ fixDone=done; editRect=rect||null; mode='cutout'; $('capTitle').textContent='Fix this cutout'; $('capDlg').showModal(); setImage(canvas,canvas.width,canvas.height); $('cutBackdrop').hidden=$('cutAnother').hidden=$('cutRetake').hidden=true; $('cutDone').textContent='✓ Use this cutout'; }
 
   async function finish(another){
     let x0=W,y0=H,x1=-1,y1=-1; const k=new Uint8Array(W*H);
@@ -171,7 +184,7 @@ const Cut = (() => {
     if(another){
       // Blank out what was just taken, so the next cut is whatever else is on the page.
       pushUndo(); for(let i=0;i<W*H;i++) if(k[i]) edit[i]=-1; draw();
-      toast('Added. Draw around the next one, or use “Bring back”.');
+      toast('Added. Draw around the next one, or use “Add”.');
     } else close();
   }
   async function asBackdrop(){
@@ -195,7 +208,7 @@ const Cut = (() => {
   function stopCam(){ if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('camVideo').srcObject=null; }
   function showSource(){ src=null; $('capCut').hidden=true; $('capSource').hidden=false; startCam(); }
   function open(m){ mode=m; $('capTitle').textContent=m==='backdrop'?'Add a backdrop':'Add a drawing'; $('capDlg').showModal(); showSource(); }
-  function close(){ stopCam(); src=null; fixDone=null; $('cutBackdrop').hidden=$('cutRetake').hidden=false; $('cutDone').textContent='✓ Add to stage'; $('capDlg').close(); }
+  function close(){ stopCam(); src=null; fixDone=null; editRect=null; $('cutBackdrop').hidden=$('cutRetake').hidden=false; $('cutDone').textContent='✓ Add to stage'; $('capDlg').close(); }
 
   function init(o){
     ({onCutout,onBackdrop,toast}=o);

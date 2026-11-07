@@ -140,8 +140,8 @@
       <label class="check" id="holesWrap"><input type="checkbox" id="keepHoles" checked> Keep white inside the drawing</label>
       <div class="toolRow" role="group" aria-label="Cut tools">
         <button data-tool="lasso" class="on">✂ Draw around</button>
-        <button data-tool="erase">Erase</button>
-        <button data-tool="restore">Bring back</button>
+        <button data-tool="erase">➖ Erase</button>
+        <button data-tool="restore">➕ Add</button>
         <button data-tool="magic">Tap to remove</button>
       </div>
       <label class="stack">Brush size <input type="range" id="brush" min="6" max="120" value="36"></label>
@@ -187,13 +187,18 @@
 </dialog>
 
 <dialog id="sfxDlg">
-  <h2>Record a sound effect</h2>
-  <p class="hint">Press Record, make your sound, then press Stop. Quiet bits at the start and end are cut off.</p>
-  <div class="sfxMeter"><span class="meter" role="img" aria-label="Microphone volume"><span class="micBar"></span></span><span id="sfxTime" aria-live="polite"></span></div>
-  <button id="sfxRecGo" class="rec big wide"><span class="dot"></span> Record</button>
+  <h2 id="sfxTitle">Record a sound effect</h2>
+  <div id="sfxRecBox">
+    <p class="hint">Press Record, make your sound, then press Stop.</p>
+    <div class="sfxMeter"><span class="meter" role="img" aria-label="Microphone volume"><span class="micBar"></span></span><span id="sfxTime" aria-live="polite"></span></div>
+    <button id="sfxRecGo" class="rec big wide"><span class="dot"></span> Record</button>
+  </div>
   <p id="sfxMsg" aria-live="polite"></p>
   <div id="sfxDoneBox" hidden>
-    <div class="dlgBtns sfxRow"><button id="sfxPlay">▶ Listen</button><button id="sfxAgain">↺ Try again</button></div>
+    <p class="hint">Drag the handles to cut off the start or end.</p>
+    <canvas id="sfxWave" height="120" aria-hidden="true"></canvas>
+    <div class="sfxTrim"><label>Start <input type="range" id="sfxA" min="0" max="1000" value="0"></label><label>End <input type="range" id="sfxB" min="0" max="1000" value="1000"></label></div>
+    <div class="dlgBtns sfxRow"><button id="sfxPlay">▶ Listen</button><button id="sfxAgain">↺ Record again</button><span id="sfxLen"></span></div>
     <label class="stack">Name <input id="sfxName" maxlength="30"></label>
     <div class="dlgBtns"><button id="sfxKeep" class="primary big">✓ Make it a button</button></div>
   </div>

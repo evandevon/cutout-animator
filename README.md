@@ -11,7 +11,7 @@ It runs entirely in the browser. Photos and recordings stay on the device: nothi
 ## Using it
 
 1. Go to <https://evandevon.github.io/cutout-animator/>.
-2. **Add a drawing.** Take a photo, choose a picture or paste one. White paper is removed automatically. Tidy up with Draw around, Erase, Bring back and Tap to remove.
+2. **Add a drawing.** Take a photo, choose a picture or paste one. White paper is removed automatically. Tidy up with Draw around, Erase, Add and Tap to remove.
 3. **Or use the library.** Choose ready-made people, animals, buildings, vehicles and more from the Cutouts tab.
 4. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Park cutouts in the dark area outside the frame so they can walk on later.
 5. **Check the microphone.** The meter beside the Record button shows your volume, and the dropdown chooses a microphone if there's more than one.

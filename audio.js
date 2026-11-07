@@ -168,5 +168,5 @@ const Sound = (() => {
     let o=44; for(const c of chunks) for(let i=0;i<c.length;i++,o+=2){ const s=Math.max(-1,Math.min(1,c[i])); v.setInt16(o,s<0?s*32768:s*32767,true); }
     return new Blob([b],{type:'audio/wav'});
   }
-  return {master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micCollect,micTake,micTakeTrimmed,micStop};
+  return {wav,master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micCollect,micTake,micTakeTrimmed,micStop};
 })();
