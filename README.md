@@ -12,14 +12,15 @@ It runs entirely in the browser. Photos and recordings stay on the device: nothi
 
 1. Go to <https://evandevon.github.io/cutout-animator/>.
 2. **Add a drawing.** Take a photo, choose a picture or paste one. White paper is removed automatically. Tidy up with Draw around, Erase, Bring back and Tap to remove.
-3. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and choose **Alive** for people and creatures, so they sway a little instead of standing frozen. Leave objects as **Object**. Park cutouts in the dark area outside the frame so they can walk on later.
-4. **Check the microphone.** The meter beside the Record button shows your volume, and the dropdown chooses a microphone if there's more than one.
-5. **Record.** Your voice, the chosen sounds and every movement are recorded. Drag with a finger or the mouse. On a touch screen, several fingers can move different cutouts at once, and pinching resizes and turns a cutout.
-6. **Teach a move (optional).** Tap a cutout, press Teach a move, drag it and let go. It repeats that move during recording. Grab it and it follows you, then glides back to where you grabbed it and carries on.
-7. **Sound effects (optional).** In the Sounds tab, tick sounds to get big buttons under the stage, and tap them while recording.
-8. **Add more.** Plays the scene back so you can move another cutout or add more voice.
-9. Use the **＋** after the last scene to add another scene.
-10. **Make video** joins the scenes into a video. **Save** downloads a `.cutz` project file that can be reopened and edited from the ☰ menu.
+3. **Or use the library.** Choose ready-made people, animals, buildings, vehicles and more from the Cutouts tab.
+4. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Park cutouts in the dark area outside the frame so they can walk on later.
+5. **Check the microphone.** The meter beside the Record button shows your volume, and the dropdown chooses a microphone if there's more than one.
+6. **Record.** Your voice, the chosen sounds and every movement are recorded. Drag with a finger or the mouse. On a touch screen, several fingers can move different cutouts at once, and pinching resizes and turns a cutout.
+7. **Teach a move (optional).** Tap a cutout, press Teach a move, drag it and let go. It repeats that move during recording. Grab it and it follows you, then glides back to where you grabbed it and carries on.
+8. **Sound effects (optional).** In the Sounds tab, tick sounds to get big buttons under the stage, and tap them while recording.
+9. **Add more.** Plays the scene back so you can move another cutout or add more voice.
+10. Use **＋** for a new blank scene, or **Continue story** for a new scene that starts where the selected one finishes.
+11. **Make video** makes one video of the whole story, or a separate video for each scene. **Save** downloads a `.cutz` project file that can be reopened and edited from the ☰ menu.
 
 Work also autosaves on the device and is offered back next time the page opens.
 
@@ -32,6 +33,10 @@ Work also autosaves on the device and is offered back next time the page opens.
 
 To change the sheet, edit `tools/make_templates.py` and the matching numbers at the top of `template.js`.
 
+## On a class board
+
+In the ☰ menu, turn on **Big buttons** and choose **Full screen**. Controls also scale up on their own on large screens.
+
 ## Project files
 
 A `.cutz` file is a zip holding `project.json` (scenes, layouts and recorded movement) and `assets/` (cutouts, backdrops and audio). Pictures and sounds travel inside the file, so it opens on any device.
@@ -43,9 +48,9 @@ The app records movement data and audio, not screen video. Toolbars stay out of 
 ## Browser notes
 
 - Use the HTTPS address above. Camera and microphone don't work from a `file://` page.
-- Video comes out as MP4 where the browser can encode it directly. Otherwise the scene plays through once in real time to record it, which may give WebM on some browsers.
+- Video is made frame by frame where the browser can encode it directly, so slow computers just take longer and the result is the same, even if you switch tabs. Older browsers, including older iPad Safari, can only record it in real time with the tab showing: it pauses and restarts if the tab is hidden, and may look jumpy on slow devices.
 - Headphones give the cleanest voice recording, because the microphone can't pick up the music.
 
 ## Credits
 
-Paper removal is adapted from Classroom Aquarium. Sound effects come from the Frame by Frame library. Background sounds and music are generated in code (`audio.js`). Uses [JSZip](https://stuk.github.io/jszip/) and [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT) and [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0), included in `vendor/`.
+Paper removal is adapted from Classroom Aquarium. Sound effects come from the Frame by Frame library. Background sounds and music are generated in code (`audio.js`). Uses [JSZip](https://stuk.github.io/jszip/) and [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT) and [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0), and the [Nunito](https://fonts.google.com/specimen/Nunito) font (OFL), included in `vendor/`.

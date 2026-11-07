@@ -23,12 +23,13 @@
 <main id="main">
   <aside id="side">
     <div class="tabs" role="tablist">
-      <button role="tab" data-tab="cast" class="on">Cutouts</button>
-      <button role="tab" data-tab="back">Backdrop</button>
-      <button role="tab" data-tab="sound">Sounds</button>
+      <button role="tab" data-tab="cast" class="on">✂️ Cutouts</button>
+      <button role="tab" data-tab="back">🏞️ Backdrop</button>
+      <button role="tab" data-tab="sound">🎵 Sounds</button>
     </div>
     <section class="tab" id="tab-cast">
       <button id="addDrawing" class="primary wide">📷 Add a drawing</button>
+      <button id="addLibrary" class="wide">🧸 Choose from the library</button>
       <button id="addWords" class="wide">Aa Add words</button>
       <p class="hint">Tap a cutout to put it on the stage.</p>
       <div id="castList" class="grid"></div>
@@ -60,11 +61,19 @@
   <section id="center">
     <div id="stageWrap">
       <canvas id="stage" tabindex="0" role="application" aria-label="Stage. Use Tab to choose a cutout, arrow keys to move it, square brackets to resize, comma and full stop to turn, F to flip."></canvas>
-      <div id="emptyHint" hidden>Add a drawing to get started</div>
+      <div id="emptyHint" hidden>
+        <p>What's in your story?</p>
+        <div><button id="startDraw" class="primary big">📷 Add my drawing</button><button id="startLib" class="big">🧸 Pick from the library</button></div>
+      </div>
       <div id="teachHint" hidden>Drag it the way it should move, then let go</div>
       <div id="countdown" hidden aria-live="assertive"></div>
       <div id="itemBar" hidden>
-        <button id="itAlive" aria-pressed="false" title="Alive cutouts sway a little, like someone standing still. Objects stay still."></button>
+        <span class="animSet" role="group" aria-label="Animation">
+          <button data-anim="sway" aria-pressed="false" aria-label="Sway" title="Sway: moves a little, like someone standing">🙂<span class="lab2"> Sway</span></button>
+          <button data-anim="hop" aria-pressed="false" aria-label="Hop" title="Hop: keeps bouncing">🐸<span class="lab2"> Hop</span></button>
+          <button data-anim="float" aria-pressed="false" aria-label="Float" title="Float: bobs gently, like a boat or cloud">🎈<span class="lab2"> Float</span></button>
+          <button data-anim="spin" aria-pressed="false" aria-label="Spin" title="Spin: keeps turning">🌀<span class="lab2"> Spin</span></button>
+        </span>
         <button id="itLoop" aria-label="Teach a looping move">🔁<span class="lab2"> Teach a move</span></button>
         <button id="itLoopRedo" aria-label="Teach the move again" title="Teach the move again" hidden>↺</button>
         <button id="itFlip" aria-label="Flip">⇄<span class="lab2"> Flip</span></button>
@@ -103,7 +112,6 @@
   <div id="sceneBtns">
     <button id="moveL" aria-label="Move scene earlier">◀</button>
     <button id="moveR" aria-label="Move scene later">▶</button>
-    <button id="dupScene" aria-label="Continue in a new scene" title="New scene that starts where this one finishes">⧉<span class="lab2"> Continue</span></button>
     <button id="delScene" class="danger" aria-label="Delete scene">✕</button>
   </div>
 </footer>
@@ -172,29 +180,45 @@
   <div class="dlgBtns"><button id="tplAdd" class="primary big" disabled>✓ Add scenes</button></div>
 </dialog>
 
+<dialog id="libDlg" class="full">
+  <div class="dlgHead"><h2>Library</h2><div class="spacer"></div><button id="libClose" class="primary">Done</button></div>
+  <p class="hint">Tap as many as you like. They go straight onto the stage.</p>
+  <div id="libTabs" class="libTabs"></div>
+  <div id="libGrid"></div>
+</dialog>
+
 <dialog id="askDlg"><h2 id="askTitle"></h2><p id="askMsg"></p><input id="askInput" hidden><div id="askBtns" class="dlgBtns"></div></dialog>
 
 <dialog id="exportDlg">
   <h2>Make video</h2>
   <div id="expSetup">
     <p id="expInfo"></p>
+    <fieldset id="expKindWrap"><legend>Make</legend>
+      <label class="check"><input type="radio" name="expKind" value="all" checked> One video of the whole story</label>
+      <label class="check"><input type="radio" name="expKind" value="each"> A separate video for each scene</label>
+    </fieldset>
     <label class="stack">Size
       <select id="expSize"><option value="1280">720p (HD, smaller file)</option><option value="1920" selected>1080p (Full HD)</option></select></label>
     <div class="dlgBtns"><button id="expCancel">Cancel</button><button id="expGo" class="primary">Make video</button></div>
   </div>
   <div id="expRun" hidden>
     <p id="expStatus" aria-live="polite"></p><progress id="expProg" max="1" value="0"></progress>
+    <p class="hint">You can switch to another tab while this runs.</p>
+    <div class="dlgBtns"><button id="expCancelRun">Cancel</button></div>
   </div>
   <div id="expDone" hidden>
     <video id="expVideo" controls playsinline></video>
     <p id="expNote"></p>
-    <div class="dlgBtns"><button id="expClose">Close</button><button id="expShare" hidden>Share</button><a id="expDl" class="btn primary">Download video</a></div>
+    <div id="expList"></div>
+    <div class="dlgBtns"><button id="expClose">Close</button><button id="expShare" hidden>Share</button><button id="expZip" class="primary" hidden>Download all (zip)</button><a id="expDl" class="btn primary">Download video</a></div>
   </div>
 </dialog>
 
 <dialog id="menuDlg">
   <h2>More options</h2>
   <div class="menuBtns">
+    <label class="check"><input type="checkbox" id="bigUI"> 🔍 Big buttons, for the class board</label>
+    <button id="fsBtn">⛶ Full screen</button>
     <button id="newBtn">📄 New project</button>
     <button id="openBtn">📂 Open a project file</button>
     <button id="helpBtn">❓ How it works</button>
@@ -210,12 +234,14 @@
   <p>Cutout Animator lives at <a href="https://evandevon.github.io/cutout-animator/" target="_blank" rel="noopener">evandevon.github.io/cutout-animator</a>. Open it in a browser on any computer, tablet or phone.</p>
   <ol>
     <li><b>Add a drawing.</b> Photograph it on white paper and the paper is cut away. Draw around it or use the brushes to tidy it up.</li>
-    <li><b>Set the scene.</b> Choose a backdrop, background sound and music, then place your cutouts. Tap a cutout and choose <b>Alive</b> if it's a person or creature, so it sways a little instead of standing frozen. Park cutouts in the dark area outside the frame so they can walk on later. That area isn't in the video.</li>
+    <li><b>Or use the library.</b> In the Cutouts tab, choose ready-made people, animals, buildings, vehicles and more.</li>
+    <li><b>Set the scene.</b> Choose a backdrop, background sound and music, then place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Park cutouts in the dark area outside the frame so they can walk on later. That area isn't in the video.</li>
     <li><b>Press Record.</b> Tell the story and drag your cutouts at the same time. Several people can drag different cutouts on a touch screen.</li>
     <li><b>Teach a move.</b> Tap a cutout, press Teach a move, then drag it and let go. It repeats that move for the whole recording. If you grab it, it follows you, then glides back to where you grabbed it and carries on.</li>
     <li><b>Sound effects.</b> Tick sounds in the Sounds tab to get big buttons under the stage. Tap them while recording.</li>
+    <li><b>More scenes.</b> ＋ makes a new blank scene. <b>Continue story</b> makes a new scene that starts where the selected one finishes, with the same cutouts, backdrop and sounds.</li>
     <li><b>Add more.</b> Plays the scene back so you can move another cutout or add more voice. This is how to move several cutouts with a mouse.</li>
-    <li><b>Make video</b> joins your scenes into a video. <b>Save project</b> keeps a file you can open later and keep editing.</li>
+    <li><b>Make video</b> makes one video of the whole story, or a separate video for each scene. <b>Save project</b> keeps a file you can open later and keep editing.</li>
   </ol>
   <h3>Templates for a whole class</h3>
   <p>In the ☰ menu, print a template. Students draw a backdrop and characters, write a script and tick sounds. Then choose <b>Add filled-in templates</b> and pick the scanned JPGs or PDFs, or use a webcam. Each sheet becomes one scene, and the script shows on screen during recording.</p>
@@ -232,6 +258,7 @@
 <script src="vendor/pdf/pdf.min.js"></script>
 <script src="audio.js"></script>
 <script src="cut.js"></script>
+<script src="library.js"></script>
 <script src="template.js"></script>
 <script src="app.js"></script>
 </body>
