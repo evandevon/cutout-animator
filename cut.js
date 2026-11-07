@@ -67,17 +67,19 @@ const Cut = (() => {
   const kept=i=>edit[i]===1||(auto[i]&&edit[i]!==-1);
 
   const maskCv=document.createElement('canvas');
-  function draw(){
+  let hover=null;
+  function draw(rebuild=true){
     if(!src) return;
     fit();
-    maskCv.width=W; maskCv.height=H; const m=maskCv.getContext('2d'), d=m.createImageData(W,H);
+    if(rebuild){ maskCv.width=W; maskCv.height=H; const m=maskCv.getContext('2d'), d=m.createImageData(W,H);
     for(let i=0,q=0;i<W*H;i++,q+=4) if(kept(i)){ d.data[q]=pix[q]*whiteGain;d.data[q+1]=pix[q+1]*whiteGain;d.data[q+2]=pix[q+2]*whiteGain;d.data[q+3]=255; }
-    m.putImageData(d,0,0);
+    m.putImageData(d,0,0); }
     cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cv.width,cv.height);
     const sq=Math.ceil(12*view.dpr); for(let y=0;y<cv.height;y+=sq)for(let x=0;x<cv.width;x+=sq){ cx.fillStyle=((x+y)/sq)%2?'#cfe8e8':'#fff'; cx.fillRect(x,y,sq,sq); }
-    cx.globalAlpha=.16; cx.drawImage(src,0,0,cv.width,cv.height); cx.globalAlpha=1;
+    cx.globalAlpha=.38; cx.drawImage(src,0,0,cv.width,cv.height); cx.globalAlpha=1; // faint original, so you can see what Bring back will restore
     cx.drawImage(maskCv,0,0,cv.width,cv.height);
     if(stroke&&tool==='lasso'&&stroke.pts.length>1){ cx.beginPath(); stroke.pts.forEach((p,i)=>{ const X=p[0]*view.k,Y=p[1]*view.k; i?cx.lineTo(X,Y):cx.moveTo(X,Y); }); cx.strokeStyle='#e0301e'; cx.lineWidth=3*view.dpr; cx.setLineDash([10*view.dpr,6*view.dpr]); cx.stroke(); cx.setLineDash([]); }
+    if(hover&&(tool==='erase'||tool==='restore')){ const R=+$('brush').value/2*view.dpr,X=hover[0]*view.k,Y=hover[1]*view.k; cx.beginPath(); cx.arc(X,Y,R,0,7); cx.lineWidth=3*view.dpr; cx.strokeStyle='#fff'; cx.stroke(); cx.lineWidth=1.5*view.dpr; cx.strokeStyle=tool==='erase'?'#e0301e':'#0b6e6e'; cx.setLineDash([5*view.dpr,4*view.dpr]); cx.stroke(); cx.setLineDash([]); }
   }
   function fit(){
     const box=cv.parentElement.getBoundingClientRect(), dpr=Math.min(2,devicePixelRatio||1), s=Math.min(box.width/W,box.height/H);
@@ -106,9 +108,10 @@ const Cut = (() => {
   cv.addEventListener('pointerdown',e=>{ if(!src) return; cv.setPointerCapture(e.pointerId); e.preventDefault(); const p=pos(e); pushUndo();
     if(tool==='magic'){ magic(p); draw(); return; }
     stroke={pts:[p]}; if(tool!=='lasso'){ stamp(p,tool==='erase'?-1:1); draw(); } });
-  cv.addEventListener('pointermove',e=>{ if(!stroke) return; const p=pos(e),l=stroke.pts[stroke.pts.length-1]; stroke.pts.push(p);
+  cv.addEventListener('pointermove',e=>{ hover=pos(e); if(!stroke){ if(tool==='erase'||tool==='restore') draw(false); return; } const p=pos(e),l=stroke.pts[stroke.pts.length-1]; stroke.pts.push(p);
     if(tool!=='lasso') line(l,p,tool==='erase'?-1:1); draw(); });
-  const end=()=>{ if(!stroke) return; if(tool==='lasso') lassoApply(stroke.pts); stroke=null; draw(); };
+  const end=e=>{ if(e&&e.pointerType&&e.pointerType!=='mouse') hover=null; if(!stroke) return; if(tool==='lasso') lassoApply(stroke.pts); stroke=null; draw(); };
+  cv.addEventListener('pointerleave',e=>{ if(e.pointerType!=='mouse'&&stroke) return; hover=null; if(src) draw(false); }); $('brush').addEventListener('input',()=>{ if(src){ if(!hover){ const r=cv.getBoundingClientRect(); hover=[W/2,H/2]; } draw(false); } });
   cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
 
   function setImage(source,sw,sh){
