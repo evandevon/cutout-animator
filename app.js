@@ -265,6 +265,7 @@ async function startRecording(layer){
   if(voiceWanted){ await micOn(); micOK=!!Sound.mic.stream; if(!micOK) toast("The microphone isn't available, so this recording has no voice."); }
   else if(Sound.mic.stream){ Sound.micStop(); micUI(); } // no voice wanted: free the microphone so Windows doesn't mute the sounds
   mode='count'; setLive(true); $('countdown').hidden=false;
+  if(micOK){ await Sound.micReady(); Sound.micCollect(); } // listen from the countdown on, so the voice is there from the very first moment
   const buf=await preload(scene); for(const r of scenePads(scene)) Sound.buffer(r,project.assets).catch(()=>{});
   for(const n of [3,2,1]){ $('countdown').textContent=n; await new Promise(r=>setTimeout(r,700)); }
   $('countdown').hidden=true; beginTake(scene,layer,buf);
@@ -276,7 +277,7 @@ function beginTake(scene,layer,buf){
   rec={scene,layer:!!layer,t0,tracks:{},last:{},over:{},loopS:{},fx:[],prevT:0,lastPush:{},vel:{}};
   for(const [id,p] of live) rec.last[id]={...p};
   stopAudio=Sound.schedule(c,Sound.master(c),scene,t0,buf,mixNow(),{dur:Infinity,withTake:!!layer});
-  if(micOK) Sound.micCollect();
+  if(micOK&&!Sound.micCollecting()) Sound.micCollect();
   mode='rec'; $('nextSceneBtn').hidden=!nextOpen();
 }
 const nextOpen=()=>{ const i=project.scenes.indexOf(cur()),n=project.scenes[i+1]; return !!(n&&!n.take)&&!rec?.layer; };
@@ -309,7 +310,7 @@ function finishTake(){
   sample(t,1/60);
   for(const it of scene.items){ const tr=rec.tracks[it.id],p=live.get(it.id); if(tr&&p&&Math.abs(tr[tr.length-1][1]-p.x)+Math.abs(tr[tr.length-1][2]-p.y)>.05) tr.push(frame(t,p)); }
   checkpoint();
-  let voice=null; if(micOK){ const b=Sound.micTake(); if(b){ const a=addAsset('audio',b,'Voice '+new Date().toLocaleTimeString()); voice={assetId:a.id,t:0}; } }
+  let voice=null; if(micOK){ const b=Sound.micTake(rec.t0); if(Sound.mic.lateBy>.05) console.warn('Microphone started '+Sound.mic.lateBy.toFixed(2)+'s late; padded with silence'); if(b){ const a=addAsset('audio',b,'Voice '+new Date().toLocaleTimeString()); voice={assetId:a.id,t:0}; } }
   if(rec.layer&&scene.take){
     const old=scene.take, tracks={...old.tracks};
     for(const id of Object.keys(rec.tracks)){ const T=rec.over[id]??0; tracks[id]=(old.tracks[id]||[]).filter(f=>f[0]<T).concat(rec.tracks[id]); }

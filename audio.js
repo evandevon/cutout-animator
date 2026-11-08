@@ -120,9 +120,12 @@ const Sound = (() => {
 
   /* Microphone: raw samples via AudioWorklet (ScriptProcessor as a fallback), so scenes
      can run straight on from one another with no gap and no recorder format problems. */
-  const mic={stream:null,node:null,src:null,sink:null,chunks:null,level:0};
-  const WORKLET=`class Cap extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor('cap',Cap)`;
-  function onSamples(s){ let p=0; for(let i=0;i<s.length;i+=8) p=Math.max(p,Math.abs(s[i])); mic.level=Math.max(p,mic.level*.85); if(mic.chunks) mic.chunks.push(s); }
+  const mic={stream:null,node:null,src:null,sink:null,chunks:null,level:0,waiters:[]};
+  /* Each block of samples carries the audio clock time it was captured at, so a take can be lined up exactly with the moment recording began. */
+  const WORKLET=`class Cap extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage({t:currentTime,d:c.slice(0)});return true}}registerProcessor('cap',Cap)`;
+  function onSamples(m){ const s=m.d; let p=0,live=false; for(let i=0;i<s.length;i+=8){ const a=Math.abs(s[i]); if(a>p) p=a; if(a) live=true; } mic.level=Math.max(p,mic.level*.85); if(live&&mic.waiters.length){ const w=mic.waiters; mic.waiters=[]; w.forEach(f=>f()); } if(mic.chunks) mic.chunks.push(m); }
+  // Resolves once the microphone is really sending sound (a freshly opened microphone can take a moment to wake up).
+  function micReady(ms=1500){ return new Promise(r=>{ const t=setTimeout(()=>{ mic.waiters=mic.waiters.filter(f=>f!==go); r(false); },ms), go=()=>{ clearTimeout(t); r(true); }; mic.waiters.push(go); }); }
   let micBusy=null;
   function micStart(deviceId){ if(mic.stream) return Promise.resolve(true); if(!micBusy) micBusy=micOpen(deviceId).finally(()=>micBusy=null); return micBusy; }
   async function micOpen(deviceId){
@@ -138,20 +141,32 @@ const Sound = (() => {
       mic.node.port.onmessage=e=>onSamples(e.data);
     }catch(_){
       mic.node=c.createScriptProcessor(2048,1,1);
-      mic.node.onaudioprocess=e=>onSamples(e.inputBuffer.getChannelData(0).slice(0));
+      mic.node.onaudioprocess=e=>onSamples({t:c.currentTime-e.inputBuffer.duration,d:e.inputBuffer.getChannelData(0).slice(0)});
     }
     mic.src.connect(mic.node); mic.node.connect(mic.sink);
     return true;
   }
   function micCollect(){ mic.chunks=[]; }
-  function micTake(){
+  const micCollecting=()=>!!mic.chunks;
+  /* The voice for a take, starting exactly at audio time t0: anything captured before t0 is dropped,
+     and if the microphone was late or skipped, silence fills the gap so the voice stays in step with the movement. */
+  function micTake(t0){
     const ch=mic.chunks; mic.chunks=null; if(!ch||!ch.length) return null;
-    const n=ch.reduce((a,b)=>a+b.length,0); return wav(ch,n,audioCtx().sampleRate);
+    const sr=audioCtx().sampleRate, out=[]; let pos=0;
+    for(const {t,d} of ch){
+      let at=t0==null?pos:Math.round((t-t0)*sr), seg=d;
+      if(at+seg.length<=0) continue;
+      if(at<0){ seg=seg.subarray(-at); at=0; }
+      if(at-pos>sr*.03){ out.push(new Float32Array(at-pos)); pos=at; }   // a real gap: keep the timing
+      out.push(seg); pos+=seg.length;                                        // small clock wobble: just carry on
+    }
+    if(!pos) return null; mic.lateBy=t0==null?0:Math.max(0,(ch.find(c=>c.t+c.d.length/sr>t0)||{t:t0}).t-t0);
+    return wav(out,pos,sr);
   }
   // For recorded sound effects: cut the silence before and after, keeping a little breathing room.
   function micTakeTrimmed(){
     const ch=mic.chunks; mic.chunks=null; if(!ch||!ch.length) return null;
-    const n=ch.reduce((x,y)=>x+y.length,0),all=new Float32Array(n); let o=0; for(const c of ch){ all.set(c,o); o+=c.length; }
+    const n=ch.reduce((x,y)=>x+y.d.length,0),all=new Float32Array(n); let o=0; for(const {d} of ch){ all.set(d,o); o+=d.length; }
     const sr=audioCtx().sampleRate,win=Math.round(sr*.01); let peak=0; for(let i=0;i<n;i++) peak=Math.max(peak,Math.abs(all[i])); if(peak<.03) return null;
     const lim=Math.max(.015,peak*.08),loud=i=>{ for(let j=i;j<Math.min(n,i+win);j++) if(Math.abs(all[j])>lim) return true; return false; };
     let s=0; while(s<n&&!loud(s)) s+=win; let e=n-win; while(e>s&&!loud(e)) e-=win;
@@ -174,5 +189,5 @@ const Sound = (() => {
   function setAec(v){ S.aec=!!v; }
   function setSink(id){ S.sink=id||''; if(ctx&&ctx.setSinkId) ctx.setSinkId(S.sink).catch(()=>{}); }
   function testTone(){ const c=audioCtx(),t=c.currentTime+.05; [523.25,659.25,783.99].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain(); o.type='triangle'; o.frequency.value=f; g.gain.setValueAtTime(0,t+i*.18); g.gain.linearRampToValueAtTime(.35,t+i*.18+.02); g.gain.exponentialRampToValueAtTime(.001,t+i*.18+.5); o.connect(g); g.connect(master(c)); o.start(t+i*.18); o.stop(t+i*.18+.55); }); }
-  return {get aec(){ return S.aec; },setAec,setSink,testTone,canPickOutput:typeof AudioContext!=='undefined'&&'setSinkId' in AudioContext.prototype,wav,master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micCollect,micTake,micTakeTrimmed,micStop};
+  return {get aec(){ return S.aec; },setAec,setSink,testTone,canPickOutput:typeof AudioContext!=='undefined'&&'setSinkId' in AudioContext.prototype,wav,master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micReady,micCollect,micCollecting,micTake,micTakeTrimmed,micStop};
 })();
