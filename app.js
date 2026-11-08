@@ -6,7 +6,7 @@
    (which can't capture the screen from a web page), and lets export render every frame exactly. */
 (() => {
 const $=id=>document.getElementById(id);
-const W=1280,H=720,MX=150,MY=90,VW=W+MX*2,VH=H+MY*2;
+const W=1280,H=720,MX=300,MY=90,VW=W+MX*2,VH=H+MY*2;
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const fmt=t=>{ t=Math.max(0,t); return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0'); };
@@ -74,11 +74,27 @@ function animAt(it,h,t){ let n=0; for(const ch of it.id) n=(n*31+ch.charCodeAt(0
     case 'float': return {x:a*7*Math.sin(.6*t+f),y:a*14*Math.sin(1.15*t+f),r:.06*Math.sin(.9*t+2*f),s:1};
     case 'spin': return {x:0,y:0,r:1.5*t,s:1};
     default: return none; } }
-function drawItem(c,it,p,t=0){ const im=imgs.get(it.assetId); if(!im) return; let w=im.naturalWidth*p.s,h=im.naturalHeight*p.s; const v=animAt(it,h,t); w*=v.s; h*=v.s; c.save(); c.translate(p.x+v.x,p.y+v.y);
-  if(v.feet){ c.rotate(p.r+(p.tilt||0)); c.scale(p.flip?-1:1,1); c.translate(0,h/2); c.rotate(v.r); c.scale(1,v.sy); c.translate(0,-h/2); }
-  else { c.rotate(p.r+(p.tilt||0)+v.r); c.scale(p.flip?-1:1,1); }
-  c.drawImage(im,-w/2,-h/2,w,h); c.restore(); }
-function drawScene(c,scene,poseOf,t=0){ c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); drawBackdrop(c,scene.backdrop); for(const it of scene.items) drawItem(c,it,poseOf(it),t); c.restore(); }
+/* ---------- transforms: one matrix per cutout, so a cutout stuck to another follows it ----------
+   A stuck cutout's x, y, s and r are measured in its master's own picture, not on the stage. */
+const I6=[1,0,0,1,0,0];
+const mmul=(m,n)=>[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]];
+const mT=(x,y)=>[1,0,0,1,x,y],mR=t=>{ const c=Math.cos(t),s=Math.sin(t); return [c,s,-s,c,0,0]; },mS=(x,y)=>[x,0,0,y,0,0];
+const minv=m=>{ const d=(m[0]*m[3]-m[1]*m[2])||1e-9; return [m[3]/d,-m[1]/d,-m[2]/d,m[0]/d,(m[2]*m[5]-m[3]*m[4])/d,(m[1]*m[4]-m[0]*m[5])/d]; };
+const mapp=(m,x,y)=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]];
+const mlin=(m,x,y)=>[m[0]*x+m[2]*y,m[1]*x+m[3]*y];
+const mdet=m=>m[0]*m[3]-m[1]*m[2];
+function mdecomp(m){ const s=Math.hypot(m[2],m[3]),r=Math.atan2(-m[2],m[3]); return {x:m[4],y:m[5],s,r,flip:(m[0]*Math.cos(r)+m[1]*Math.sin(r))<0}; }
+const ANIM0={x:0,y:0,r:0,s:1};
+function localMat(it,p,im,t){ const h0=im?im.naturalHeight:0,fl=p.flip?-1:1,v=t==null?ANIM0:animAt(it,h0*p.s,t);
+  if(v.feet) return [mT(p.x,p.y),mR(p.r+(p.tilt||0)),mS(fl*p.s,p.s),mT(0,h0/2),mR(v.r),mS(1,v.sy),mT(0,-h0/2)].reduce(mmul);
+  return [mT(p.x+v.x,p.y+v.y),mR(p.r+(p.tilt||0)+v.r),mS(fl*p.s*v.s,p.s*v.s)].reduce(mmul); }
+function sceneMats(scene,poseOf,t,anim=true){ const by=new Map(scene.items.map(i=>[i.id,i])),out=new Map();
+  const get=(it,depth)=>{ let r=out.get(it.id); if(r) return r; const im=imgs.get(it.assetId),p=poseOf(it),par=it.link&&depth<16?by.get(it.link):null,P=par?get(par,depth+1).m:I6;
+    r={it,p,P,im,m:mmul(P,localMat(it,p,im,anim?t:null))}; out.set(it.id,r); return r; };
+  for(const it of scene.items) get(it,0); return out; }
+function drawWith(c,e){ if(!e||!e.im) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(e.im,-w/2,-h/2,w,h); c.restore(); }
+function cornersOf(e){ if(!e||!e.im) return null; const w=e.im.naturalWidth/2,h=e.im.naturalHeight/2,A=(x,y)=>mapp(e.m,x,y); return {tl:A(-w,-h),tr:A(w,-h),br:A(w,h),bl:A(-w,h)}; }
+function drawScene(c,scene,poseOf,t=0,mats){ mats=mats||sceneMats(scene,poseOf,t); c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); drawBackdrop(c,scene.backdrop); for(const it of scene.items) drawWith(c,mats.get(it.id)); c.restore(); }
 const loopOn=it=>!!(it.loop&&it.loop.on);
 function loopPose(it,t){ if(!loopOn(it)) return it; const F=it.loop.frames,D=it.loop.dur,T=((t%D)+D)%D; let a=0,b=F.length-1; while(b-a>1){ const m=(a+b)>>1; if(F[m][0]<=T) a=m; else b=m; } const A=F[a],B=F[b],k=clamp((T-A[0])/((B[0]-A[0])||1),0,1),L=i=>A[i]+(B[i]-A[i])*k;
   return {x:it.x+L(1),y:it.y+L(2),s:it.s*L(3),r:it.r+L(4),flip:it.flip,tilt:0}; }
@@ -94,22 +110,32 @@ const cv=$('stage'),ctx=cv.getContext('2d'); let vs=1,dpr=1;
 function resize(){ const wr=$('stageWrap'),cs=getComputedStyle(wr),b={width:wr.clientWidth,height:wr.clientHeight-parseFloat(cs.paddingTop)}; if(!b.width||b.height<=0) return; dpr=Math.min(2.5,devicePixelRatio||1); const k=Math.min(b.width/VW,b.height/VH),cw=Math.floor(VW*k),ch=Math.floor(VH*k);
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; cv.width=Math.floor(cw*dpr); cv.height=Math.floor(ch*dpr); vs=cv.width/VW; }
 new ResizeObserver(resize).observe($('stageWrap'));
-function corners(it,p){ const im=imgs.get(it.assetId); if(!im) return null; const hw=im.naturalWidth*p.s/2,hh=im.naturalHeight*p.s/2,cs=Math.cos(p.r),sn=Math.sin(p.r),R=(x,y)=>[p.x+x*cs-y*sn,p.y+x*sn+y*cs]; return {tl:R(-hw,-hh),tr:R(hw,-hh),br:R(hw,hh),bl:R(-hw,hh)}; }
 function poseNow(it){ if(mode==='rec') return live.get(it.id)||it; if(mode==='play'&&playing) return poseAt(it,playing.scene.take,playing.t); if(mode==='setup'&&it.id!==selId&&loopOn(it)) return loopPose(it,performance.now()/1000); return it; }
+function nowT(){ const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches; return mode==='rec'&&rec?recTime():playing?playing.t:reduce?0:performance.now()/1000; }
+function matsNow(){ return sceneMats(playing?playing.scene:cur(),poseNow,nowT()); }
+const centreOf=e=>mapp(e.m,0,0);
 function render(){
-  const scene=playing?playing.scene:cur();
+  const scene=playing?playing.scene:cur(),px=1/vs*dpr;
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#2d2730'; ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(vs,0,0,vs,MX*vs,MY*vs); ctx.imageSmoothingQuality='high';
-  const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches, T=mode==='rec'&&rec?recTime():playing?playing.t:reduce?0:performance.now()/1000;
-  drawScene(ctx,scene,poseNow,T);
+  if(mode!=='play'){ ctx.fillStyle='#ffffff38'; ctx.font='800 26px "Nunito",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText('OFF STAGE',-MX/2,-MY+14); ctx.fillText('OFF STAGE',W+MX/2,-MY+14); }
+  const T=nowT(),mats=sceneMats(scene,poseNow,T);
+  drawScene(ctx,scene,poseNow,T,mats);
   // Off-stage "wings": cutouts stay visible here for the performer, but the video crops them out.
-  ctx.save(); ctx.globalAlpha=.55; for(const it of scene.items){ const p=poseNow(it),c=corners(it,p); if(!c) continue; const xs=[c.tl[0],c.tr[0],c.br[0],c.bl[0]],ys=[c.tl[1],c.tr[1],c.br[1],c.bl[1]];
-    if(Math.min(...xs)<0||Math.max(...xs)>W||Math.min(...ys)<0||Math.max(...ys)>H){ ctx.save(); ctx.beginPath(); ctx.rect(-MX,-MY,VW,VH); ctx.rect(0,0,W,H); ctx.clip('evenodd'); drawItem(ctx,it,p,T); ctx.restore(); } } ctx.restore();
+  ctx.save(); ctx.globalAlpha=.55; for(const it of scene.items){ const e=mats.get(it.id),c=cornersOf(e); if(!c) continue; const xs=[c.tl[0],c.tr[0],c.br[0],c.bl[0]],ys=[c.tl[1],c.tr[1],c.br[1],c.bl[1]];
+    if(Math.min(...xs)<0||Math.max(...xs)>W||Math.min(...ys)<0||Math.max(...ys)>H){ ctx.save(); ctx.beginPath(); ctx.rect(-MX,-MY,VW,VH); ctx.rect(0,0,W,H); ctx.clip('evenodd'); drawWith(ctx,e); ctx.restore(); } } ctx.restore();
   ctx.strokeStyle=mode==='rec'?'#ff4a33':'#fff'; ctx.lineWidth=(mode==='rec'?5:2)/vs*dpr; ctx.strokeRect(0,0,W,H);
-  if(mode==='setup'){ const px=1/vs*dpr; ctx.font=`${Math.round(22*px)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; for(const s of scene.items){ if(!s.fixed) continue; const c=corners(s,poseNow(s)); if(!c) continue; const x=Math.min(c.tl[0],c.tr[0],c.br[0],c.bl[0]),y=Math.min(c.tl[1],c.tr[1],c.br[1],c.bl[1]); ctx.beginPath(); ctx.arc(x+14*px,y+14*px,15*px,0,7); ctx.fillStyle='#fffaf0'; ctx.fill(); ctx.lineWidth=2*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillText('📌',x+14*px,y+15*px); } }
+  const badge=(x,y,ch,fill)=>{ ctx.beginPath(); ctx.arc(x,y,15*px,0,7); ctx.fillStyle=fill||'#fffaf0'; ctx.fill(); ctx.lineWidth=2*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText(ch,x,y+1*px); };
+  if(mode==='setup'){ ctx.font=`${Math.round(20*px)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(const s of scene.items){ if(!s.fixed) continue; const c=cornersOf(mats.get(s.id)); if(!c) continue; badge(Math.min(c.tl[0],c.tr[0],c.br[0],c.bl[0])+14*px,Math.min(c.tl[1],c.tr[1],c.br[1],c.bl[1])+14*px,'📌'); }
+    // links: shown only for the selected cutout and whatever it is stuck to, to keep the stage tidy
+    for(const s of scene.items){ if(!s.link||(s.id!==selId&&s.link!==selId)) continue; const e=mats.get(s.id),f=mats.get(s.link); if(!e||!f) continue; const a=centreOf(e),b=centreOf(f);
+      ctx.setLineDash([10*px,7*px]); ctx.lineWidth=4*px; ctx.strokeStyle='#2a2320'; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); ctx.lineWidth=2*px; ctx.strokeStyle='#ffe08a'; ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(b[0],b[1],7*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.stroke(); badge(a[0],a[1],'🔗','#ffe08a'); }
+    if(linkPick){ ctx.font=`${Math.round(24*px)}px sans-serif`; for(const o of linkCands()){ const e=mats.get(o.id); if(!e) continue; const [x,y]=centreOf(e); ctx.beginPath(); ctx.arc(x,y,28*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } } }
   const it=sel();
-  if(it&&mode!=='play'){ const p=poseNow(it),c=corners(it,p); if(c){ const px=1/vs*dpr; ctx.setLineDash([8*px,6*px]); ctx.lineWidth=2*px; ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(...c.tl); ctx.lineTo(...c.tr); ctx.lineTo(...c.br); ctx.lineTo(...c.bl); ctx.closePath(); ctx.stroke(); ctx.strokeStyle='#000'; ctx.lineDashOffset=8*px; ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset=0;
-      ctx.beginPath(); ctx.arc(c.tr[0],c.tr[1],13*px,0,7); ctx.fillStyle='#0b6e6e'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.strokeStyle='#fff'; ctx.stroke(); } }
+  if(it&&mode!=='play'){ const c=cornersOf(mats.get(it.id)); if(c){ ctx.setLineDash([8*px,6*px]); ctx.lineWidth=2*px; ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(...c.tl); ctx.lineTo(...c.tr); ctx.lineTo(...c.br); ctx.lineTo(...c.bl); ctx.closePath(); ctx.stroke(); ctx.strokeStyle='#000'; ctx.lineDashOffset=8*px; ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset=0;
+      if(!linkPick){ ctx.beginPath(); ctx.arc(c.tr[0],c.tr[1],13*px,0,7); ctx.fillStyle='#0b6e6e'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.strokeStyle='#fff'; ctx.stroke(); } } }
 }
 
 /* ---------- pointer control: every finger moves its own cutout ---------- */
@@ -117,19 +143,53 @@ const live=new Map(); let rec=null; const grabs=new Map();
 const world=e=>{ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)/r.width*VW-MX,(e.clientY-r.top)/r.height*VH-MY]; };
 /* Scenery can't be grabbed while recording, so taps go through to the cutouts behind it.
    While setting up, movable cutouts are picked first and scenery only if nothing else is there. */
-function hit(x,y){ return hitAny(x,y,false)||(mode==='setup'?hitAny(x,y,true):null); }
-function hitAny(x,y,scenery){
-  const items=cur().items; for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(!!it.fixed!==scenery) continue; const p=poseNow(it),im=imgs.get(it.assetId),hm=hitMaps.get(it.assetId); if(!im) continue;
-    const dx=x-p.x,dy=y-p.y,cs=Math.cos(-p.r),sn=Math.sin(-p.r); let lx=dx*cs-dy*sn; const ly=dx*sn+dy*cs; const w=im.naturalWidth*p.s,h=im.naturalHeight*p.s;
-    if(Math.abs(lx)>w/2+10||Math.abs(ly)>h/2+10) continue; if(p.flip) lx=-lx; if(!hm) return it;
-    const u=(lx/w+.5)*hm.w|0,v=(ly/h+.5)*hm.h|0; for(let b=-2;b<=2;b++)for(let a=-2;a<=2;a++){ const X=u+a,Y=v+b; if(X>=0&&Y>=0&&X<hm.w&&Y<hm.h&&hm.d[(Y*hm.w+X)*4+3]>40) return it; } }
+function hit(x,y){ const mats=matsNow(); return hitAny(x,y,false,mats)||(mode==='setup'?hitAny(x,y,true,mats):null); }
+function pixelHit(e,x,y){ if(!e||!e.im) return false; const [lx,ly]=mapp(minv(e.m),x,y),w=e.im.naturalWidth,h=e.im.naturalHeight,pad=10/Math.max(.01,Math.hypot(e.m[2],e.m[3]));
+  if(Math.abs(lx)>w/2+pad||Math.abs(ly)>h/2+pad) return false; const hm=hitMaps.get(e.it.assetId); if(!hm) return true;
+  const u=(lx/w+.5)*hm.w|0,v=(ly/h+.5)*hm.h|0; for(let b=-2;b<=2;b++)for(let a=-2;a<=2;a++){ const X=u+a,Y=v+b; if(X>=0&&Y>=0&&X<hm.w&&Y<hm.h&&hm.d[(Y*hm.w+X)*4+3]>40) return true; } return false; }
+function movableMaster(it){ let p=it,n=0; while(p&&p.link&&n++<16){ p=cur().items.find(i=>i.id===p.link); if(p&&!p.fixed) return p; } return null; }
+function hitAny(x,y,scenery,mats){
+  const items=cur().items; for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(!pixelHit(mats.get(it.id),x,y)) continue;
+    if(scenery){ if(it.fixed) return it; continue; }
+    if(!it.fixed) return it;
+    if(mode==='rec'){ const m=movableMaster(it); if(m) return m; } } // a pinned cutout stuck to another hands the tap to its master
   return null;
 }
 function target(it){ if(mode==='rec'){ touchRec(it); return live.get(it.id); } return it; }
 function touchRec(it){ if(rec&&rec.layer&&!rec.over[it.id]) rec.over[it.id]=recTime(); }
+function parentMat(it){ if(!it.link) return I6; const e=matsNow().get(it.id); return e?e.P:I6; }
+function centreW(it,p){ return mapp(parentMat(it),p.x,p.y); }
+function placeCentre(it,p,wx,wy){ const [x,y]=mapp(minv(parentMat(it)),wx,wy); p.x=x; p.y=y; }
+const turnSign=it=>mdet(parentMat(it))<0?-1:1;
+function clampFor(it,p){ if(it.link) p.s=clamp(p.s,.005,60); else clampPose(p); }
 function clampPose(p){ p.x=clamp(p.x,-MX+20,W+MX-20); p.y=clamp(p.y,-MY+20,H+MY-20); p.s=clamp(p.s,.03,8); }
-let setupMoved=false,teach=null;
-function teachStart(){ const it=sel(); if(!it) return; if(teach){ teach=null; $('teachHint').hidden=true; return; } teach={id:it.id,active:false}; $('teachHint').hidden=false; }
+let setupMoved=false,teach=null,linkPick=null;
+const nameOf=it=>(project.assets[it.assetId]||{}).name||'it';
+function isAbove(anc,o){ let p=o,n=0; const sc=cur(); while(p&&p.link&&n++<16){ if(p.link===anc.id) return true; p=sc.items.find(i=>i.id===p.link); } return false; } // is o stuck (directly or not) to anc?
+const linkCands=()=>{ const it=cur().items.find(i=>i.id===(linkPick&&linkPick.id)); return it?cur().items.filter(o=>o.id!==it.id&&!isAbove(it,o)):[]; };
+function showHint(t){ $('teachHint').textContent=t; $('teachHint').hidden=!t; }
+function linkCancel(){ linkPick=null; showHint(''); }
+function linkStart(){ const it=sel(); if(!it||mode!=='setup') return; if(teach){ teach=null; }
+  if(it.link){ checkpoint(); relink(cur(),it,null); updateItemBar(); dirty(); toast('Unstuck. '+nameOf(it)+' moves on its own again.',2200); return; }
+  if(linkPick){ linkCancel(); return; } linkPick={id:it.id}; if(!linkCands().length){ linkCancel(); toast('Add another cutout first, so this one has something to stick to.'); return; }
+  showHint('Tap what '+nameOf(it)+' should stick to'); }
+function pickLink(x,y){ const child=cur().items.find(i=>i.id===linkPick.id),mats=matsNow(),cands=linkCands(); let best=null,bd=40/vs*dpr;
+  for(const o of cands){ const e=mats.get(o.id); if(!e) continue; const [cx,cy]=centreOf(e),d=Math.hypot(x-cx,y-cy); if(d<bd){ bd=d; best=o; } }
+  if(!best) for(let i=cur().items.length-1;i>=0;i--){ const o=cur().items[i]; if(cands.includes(o)&&pixelHit(mats.get(o.id),x,y)){ best=o; break; } }
+  linkCancel(); if(!best||!child) return; checkpoint(); relink(cur(),child,best.id); selId=child.id; updateItemBar(); dirty();
+  toast(nameOf(child)+' is stuck to '+nameOf(best)+'. Move '+nameOf(best)+' and '+nameOf(child)+' comes too.',3200); }
+/* Change what a cutout is stuck to without it jumping: its pose, recorded movement and taught move are
+   converted from the old master's space to the new one's. */
+function relink(scene,it,to){
+  const base=sceneMats(scene,i=>i,0,false),oldP=base.get(it.id).P,newP=to?base.get(to).m:I6,im=imgs.get(it.assetId),conv=(P0,P1,q)=>{ const w=mmul(P0,localMat(it,{...q,tilt:0},im,null)),d=mdecomp(mmul(minv(P1),w)); return {x:d.x,y:d.y,s:d.s,r:d.r,flip:d.flip}; };
+  Object.assign(it,conv(oldP,newP,it));
+  if(it.loop&&it.loop.frames){ const flipR=Math.sign(mdet(oldP))*Math.sign(mdet(newP)),L=mmul(minv(newP),oldP); it.loop.frames=it.loop.frames.map(f=>{ const [dx,dy]=mlin(L,f[1],f[2]); return [f[0],r3(dx),r3(dy),f[3],r3(f[4]*flipR)]; }); }
+  const tr=scene.take&&scene.take.tracks[it.id];
+  if(tr) scene.take.tracks[it.id]=tr.map(f=>{ const ms=sceneMats(scene,i=>poseAt(i,scene.take,f[0]),f[0],false),P0=ms.get(it.id).P,P1=to?ms.get(to).m:I6,q=conv(P0,P1,{x:f[1],y:f[2],s:f[3],r:f[4],flip:!!f[5]}); return [f[0],r3(q.x),r3(q.y),r3(q.s),r3(q.r),q.flip?1:0,f[6]]; });
+  if(to) it.link=to; else delete it.link;
+}
+function unstickFrom(scene,ids){ for(const o of scene.items) if(o.link&&ids.includes(o.link)&&!ids.includes(o.id)){ const m=scene.items.find(i=>i.id===o.link); relink(scene,o,m&&m.link&&!ids.includes(m.link)?m.link:null); } }
+function teachStart(){ const it=sel(); if(!it) return; linkCancel(); if(teach){ teach=null; showHint(''); return; } teach={id:it.id,active:false}; showHint('Drag it the way it should move, then let go'); }
 function teachTick(now){ if(!teach||!teach.active) return; const it=cur().items.find(i=>i.id===teach.id); if(!it) return; const t=(now-teach.t0)/1000; if(t-teach.lastT<1/30) return; teach.lastT=t; const s=teach.start; teach.frames.push([r3(t),r3(it.x-s.x),r3(it.y-s.y),r3(it.s/s.s),r3(it.r-s.r)]); }
 function teachEnd(){ const it=cur().items.find(i=>i.id===teach.id),T=teach; teach=null; $('teachHint').hidden=true; if(!it) return; const s=T.start,F=T.frames; const far=F.reduce((a,f)=>Math.max(a,Math.hypot(f[1],f[2])),0),last=F[F.length-1];
   Object.assign(it,{x:s.x,y:s.y,s:s.s,r:s.r});
@@ -138,14 +198,15 @@ function teachEnd(){ const it=cur().items.find(i=>i.id===teach.id),T=teach; teac
 function beforeMove(){ if(mode==='setup'&&!setupMoved){ setupMoved=true; checkpoint(); } }
 let lastTap={t:0,id:null};
 function rebase(id){ // when fingers join or leave a cutout, restart the gesture from its present pose
-  const pts=[...grabs.values()].filter(g=>g.id===id), it=cur().items.find(i=>i.id===id); if(!it) return; const p=poseNow(it);
-  if(pts.length===1&&pts[0].kind==='drag'){ pts[0].ox=p.x-pts[0].x; pts[0].oy=p.y-pts[0].y; }
-  if(pts.length>=2){ const [a,b]=pts; it.__g={d:Math.hypot(a.x-b.x,a.y-b.y)||1,a:Math.atan2(b.y-a.y,b.x-a.x),s:p.s,r:p.r,x:p.x,y:p.y,mx:(a.x+b.x)/2,my:(a.y+b.y)/2}; }
+  const pts=[...grabs.values()].filter(g=>g.id===id), it=cur().items.find(i=>i.id===id); if(!it) return; const p=poseNow(it),[cx,cy]=centreW(it,p);
+  if(pts.length===1&&pts[0].kind==='drag'){ pts[0].ox=cx-pts[0].x; pts[0].oy=cy-pts[0].y; }
+  if(pts.length>=2){ const [a,b]=pts; it.__g={d:Math.hypot(a.x-b.x,a.y-b.y)||1,a:Math.atan2(b.y-a.y,b.x-a.x),s:p.s,r:p.r,cx,cy,mx:(a.x+b.x)/2,my:(a.y+b.y)/2}; }
 }
 cv.addEventListener('pointerdown',e=>{
   if(mode==='play'||mode==='count'){ return; } e.preventDefault(); cv.focus({preventScroll:true}); try{ cv.setPointerCapture(e.pointerId); }catch(_){}
   const [x,y]=world(e); setupMoved=false;
-  const s=sel(); if(s&&!grabs.size&&!teach){ const c=corners(s,poseNow(s)); if(c&&Math.hypot(x-c.tr[0],y-c.tr[1])<(e.pointerType==='touch'?34:24)/vs*dpr){ const p=poseNow(s); grabs.set(e.pointerId,{id:s.id,kind:'handle',x,y,d0:Math.hypot(x-p.x,y-p.y)||1,a0:Math.atan2(y-p.y,x-p.x),s0:p.s,r0:p.r,moved:true}); return; } }
+  if(linkPick){ pickLink(x,y); return; }
+  const s=sel(); if(s&&!grabs.size&&!teach){ const c=cornersOf(matsNow().get(s.id)); if(c&&Math.hypot(x-c.tr[0],y-c.tr[1])<(e.pointerType==='touch'?34:24)/vs*dpr){ const p=poseNow(s),[cx,cy]=centreW(s,p); grabs.set(e.pointerId,{id:s.id,kind:'handle',x,y,d0:Math.hypot(x-cx,y-cy)||1,a0:Math.atan2(y-cy,x-cx),s0:p.s,r0:p.r,moved:true}); return; } }
   let it=hit(x,y);
   if(!it&&mode==='setup'&&grabs.size===1){ const g=[...grabs.values()][0]; it=cur().items.find(i=>i.id===g.id)||null; }
   if(!it){ if(!grabs.size){ selId=null; updateItemBar(); } return; }
@@ -156,12 +217,12 @@ cv.addEventListener('pointerdown',e=>{
 cv.addEventListener('pointermove',e=>{
   const g=grabs.get(e.pointerId); if(!g) return; e.preventDefault(); const [x,y]=world(e); g.x=x; g.y=y;
   const it=cur().items.find(i=>i.id===g.id); if(!it) return;
-  if(g.kind==='handle'){ beforeMove(); const p=target(it); p.s=clamp(g.s0*Math.hypot(x-p.x,y-p.y)/g.d0,.03,8); p.r=g.r0+Math.atan2(y-p.y,x-p.x)-g.a0; dirtyIf(); return; }
+  if(g.kind==='handle'){ beforeMove(); const p=target(it),[cx,cy]=centreW(it,p); p.s=g.s0*Math.hypot(x-cx,y-cy)/g.d0; p.r=g.r0+(Math.atan2(y-cy,x-cx)-g.a0)*turnSign(it); clampFor(it,p); dirtyIf(); return; }
   if(!g.moved&&Math.hypot(x-g.sx,y-g.sy)>4) g.moved=true; if(!g.moved) return;
   const pts=[...grabs.values()].filter(q=>q.id===g.id); beforeMove(); const p=target(it);
-  if(pts.length>=2&&it.__g){ const [a,b]=pts,G=it.__g; p.s=G.s*Math.hypot(a.x-b.x,a.y-b.y)/G.d; p.r=G.r+Math.atan2(b.y-a.y,b.x-a.x)-G.a; p.x=G.x+(a.x+b.x)/2-G.mx; p.y=G.y+(a.y+b.y)/2-G.my; }
-  else { p.x=x+g.ox; p.y=y+g.oy; }
-  clampPose(p); dirtyIf();
+  if(pts.length>=2&&it.__g){ const [a,b]=pts,G=it.__g; p.s=G.s*Math.hypot(a.x-b.x,a.y-b.y)/G.d; p.r=G.r+(Math.atan2(b.y-a.y,b.x-a.x)-G.a)*turnSign(it); placeCentre(it,p,G.cx+(a.x+b.x)/2-G.mx,G.cy+(a.y+b.y)/2-G.my); }
+  else placeCentre(it,p,x+g.ox,y+g.oy);
+  clampFor(it,p); dirtyIf();
 });
 function dirtyIf(){ if(mode==='setup') dirty(); }
 function endPtr(e){
@@ -277,7 +338,7 @@ function tick(now){
 /* ---------- UI lists ---------- */
 function thumbURL(a){ return a.__u||(a.__u=URL.createObjectURL(a.blob)); }
 function renderCast(){ const box=$('castList'); box.innerHTML=''; for(const id of project.cast){ const a=project.assets[id]; if(!a) continue; const b=document.createElement('button'); b.className='thumb'; b.setAttribute('aria-label','Put '+(a.name||'cutout')+' on stage'); const im=new Image(); im.src=thumbURL(a); im.alt=''; b.append(im);
-    const x=document.createElement('span'); x.className='x'; x.textContent='×'; x.setAttribute('role','button'); x.setAttribute('aria-label','Delete cutout'); x.onclick=async ev=>{ ev.stopPropagation(); const used=project.scenes.some(s=>s.items.some(i=>i.assetId===id)); if(used&&!await ask('Remove this cutout?','It will disappear from every scene that uses it.',[['Keep it',null],['Remove',1,'danger']])) return; checkpoint(); project.cast=project.cast.filter(c=>c!==id); project.scenes.forEach(s=>{ const gone=s.items.filter(i=>i.assetId===id).map(i=>i.id); s.items=s.items.filter(i=>i.assetId!==id); if(s.take) gone.forEach(g=>delete s.take.tracks[g]); }); selId=null; refreshAll(); dirty(); }; b.append(x);
+    const x=document.createElement('span'); x.className='x'; x.textContent='×'; x.setAttribute('role','button'); x.setAttribute('aria-label','Delete cutout'); x.onclick=async ev=>{ ev.stopPropagation(); const used=project.scenes.some(s=>s.items.some(i=>i.assetId===id)); if(used&&!await ask('Remove this cutout?','It will disappear from every scene that uses it.',[['Keep it',null],['Remove',1,'danger']])) return; checkpoint(); project.cast=project.cast.filter(c=>c!==id); project.scenes.forEach(s=>{ const gone=s.items.filter(i=>i.assetId===id).map(i=>i.id); unstickFrom(s,gone); s.items=s.items.filter(i=>i.assetId!==id); if(s.take) gone.forEach(g=>delete s.take.tracks[g]); }); selId=null; refreshAll(); dirty(); }; b.append(x);
     b.onclick=()=>{ if(mode!=='setup') return; checkpoint(); placeCutout(a); updateItemBar(); refreshHint(); dirty(); }; box.append(b); } refreshHint(); }
 function refreshHint(){ $('emptyHint').hidden=!!cur().items.length||mode!=='setup'||!!cur().take; }
 function renderBack(){ const box=$('backList'),sc=cur(); box.innerHTML='';
@@ -347,9 +408,9 @@ const sceneUp=e=>{ if(!sd||e.pointerId!==sd.id) return; clearTimeout(sd.timer); 
 window.addEventListener('pointerup',sceneUp); window.addEventListener('pointercancel',sceneUp);
 $('sceneList').addEventListener('touchmove',e=>{ if(sd&&sd.on) e.preventDefault(); },{passive:false});
 function showCurrentScene(){ const on=$('sceneList').querySelector('.scene.on'); if(on) on.scrollIntoView({block:'nearest',inline:'nearest'}); }
-function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?prev.take.dur:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; n.pads=[...(prev.pads||[])]; n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:uid(),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,fixed:!!it.fixed,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
+function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?prev.take.dur:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; n.pads=[...(prev.pads||[])]; const ids=new Map(prev.items.map(i=>[i.id,uid()])); n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:ids.get(it.id),...(it.link&&ids.has(it.link)?{link:ids.get(it.link)}:{}),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,fixed:!!it.fixed,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
 function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
-function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
+function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); const l=$('itLink'),m=it.link&&cur().items.find(i=>i.id===it.link); l.classList.toggle('on',!!m); l.innerHTML=m?'🔗<span class="lab2"> Unstick</span>':'🔗<span class="lab2"> Stick to…</span>'; l.setAttribute('aria-label',m?'Stuck to '+nameOf(m)+'. Press to unstick':'Stick to another cutout'); l.title=m?'Stuck to '+nameOf(m)+'. Press to unstick.':'Make this follow another cutout'; } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
 function refreshTransport(){ const s=cur(),any=project.scenes.some(x=>x.take); $('playBtn').hidden=$('layerBtn').hidden=!s.take; $('playAllBtn').hidden=project.scenes.filter(x=>x.take).length<2; $('recBtn').lastChild.textContent=s.take?' Redo':' Record'; }
 function refreshAll(){ $('projName').value=project.name; renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
 
@@ -523,6 +584,7 @@ function wire(){
   $('playBtn').onclick=()=>play([cur()]); $('playAllBtn').onclick=()=>play(project.scenes);
   $('projName').oninput=e=>{ project.name=e.target.value; dirty(); };
   $('itFlip').onclick=flip;
+  $('itLink').onclick=linkStart;
   $('itFixed').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.fixed=!it.fixed; updateItemBar(); dirty(); toast(it.fixed?'Pinned: it stays put while recording, and taps go through it.':'Not pinned: you can drag it while recording.',2400); };
   $('itLoop').onclick=()=>{ const it=sel(); if(!it) return; if(it.loop){ checkpoint(); it.loop.on=!it.loop.on; updateItemBar(); dirty(); } else teachStart(); };
   $('itLoopRedo').onclick=teachStart;
@@ -530,7 +592,7 @@ function wire(){
   const reorder=d=>{ const s=cur(),i=s.items.findIndex(x=>x.id===selId); if(i<0) return; const j=clamp(i+d,0,s.items.length-1); if(i===j) return; checkpoint(); const [m]=s.items.splice(i,1); s.items.splice(j,0,m); dirty(); };
   $('itFwd').onclick=()=>reorder(1); $('itBack').onclick=()=>reorder(-1);
   $('itDup').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); const n={...it,id:uid(),x:it.x+40,y:it.y+30}; cur().items.push(n); selId=n.id; dirty(); };
-  const removeSel=()=>{ const it=sel(); if(!it) return; checkpoint(); const s=cur(); s.items=s.items.filter(x=>x.id!==it.id); if(s.take) delete s.take.tracks[it.id]; selId=null; updateItemBar(); refreshHint(); dirty(); };
+  const removeSel=()=>{ const it=sel(); if(!it) return; checkpoint(); const s=cur(); unstickFrom(s,[it.id]); s.items=s.items.filter(x=>x.id!==it.id); if(s.take) delete s.take.tracks[it.id]; selId=null; updateItemBar(); refreshHint(); dirty(); };
   $('itDel').onclick=removeSel;
   $('undoBtn').onclick=undo; $('redoBtn').onclick=redo;
   $('newBtn').onclick=async()=>{ $('menuDlg').close(); if(!await ask('Start a new project?','Anything you have not saved as a project file will be lost.',[['Cancel',null],['Start new',1,'danger']])) return; await adopt(newProject()); undoStack=[]; redoStack=[]; refreshAll(); autosave(); };
@@ -542,14 +604,16 @@ function wire(){
   window.addEventListener('keydown',e=>{
     const tag=e.target.tagName; if(tag==='INPUT'&&e.target.type!=='range'&&e.target.type!=='checkbox'||tag==='SELECT'||document.querySelector('dialog[open]')) return;
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){ e.preventDefault(); saveProject(); return; } if(e.ctrlKey||e.metaKey) return;
+    if(e.key==='Escape'&&linkPick){ linkCancel(); return; }
     if(e.key==='Escape'){ if(mode==='rec') stopRecording(); if(mode==='play') stopPlay(); return; }
     if(mode==='setup'&&(e.key==='r'||e.key==='R')){ startRecording(false); return; }
     if(/^[1-9]$/.test(e.key)&&(mode==='rec'||mode==='setup')){ const r=scenePads()[+e.key-1]; if(r) hitPad(r); return; }
     if(mode!=='setup'&&mode!=='rec') return;
     if(e.key==='Tab'&&document.activeElement===cv){ const it=cur().items.filter(x=>mode!=='rec'||!x.fixed); if(it.length){ e.preventDefault(); const i=it.findIndex(x=>x.id===selId); selId=it[(i+(e.shiftKey?-1:1)+it.length)%it.length].id; updateItemBar(); } return; }
     const it=sel(); if(!it) return; const st=e.shiftKey?40:10; let done=true; const once=()=>{ if(mode==='setup'&&!e.repeat) checkpoint(); return target(it); };
-    switch(e.key){ case 'ArrowLeft': once().x-=st; break; case 'ArrowRight': once().x+=st; break; case 'ArrowUp': once().y-=st; break; case 'ArrowDown': once().y+=st; break; case '[': once().s*=.94; break; case ']': once().s*=1.06; break; case ',': once().r-=.08; break; case '.': once().r+=.08; break; case 'f': case 'F': flip(); break; case 'Delete': case 'Backspace': if(mode==='setup') removeSel(); break; default: done=false; }
-    if(done){ e.preventDefault(); const p=mode==='rec'?live.get(it.id):it; if(p) clampPose(p); dirtyIf(); }
+    const nudge=(dx,dy)=>{ const q=once(),[cx,cy]=centreW(it,q); placeCentre(it,q,cx+dx,cy+dy); };
+    switch(e.key){ case 'ArrowLeft': nudge(-st,0); break; case 'ArrowRight': nudge(st,0); break; case 'ArrowUp': nudge(0,-st); break; case 'ArrowDown': nudge(0,st); break; case '[': once().s*=.94; break; case ']': once().s*=1.06; break; case ',': once().r-=.08; break; case '.': once().r+=.08; break; case 'f': case 'F': flip(); break; case 'Delete': case 'Backspace': if(mode==='setup') removeSel(); break; default: done=false; }
+    if(done){ e.preventDefault(); const p=mode==='rec'?live.get(it.id):it; if(p) clampFor(it,p); dirtyIf(); }
   });
   window.addEventListener('beforeunload',()=>{ clearTimeout(saveT); });
 }
@@ -557,7 +621,7 @@ function wire(){
 /* ---------- start ---------- */
 (async()=>{
   project=newProject(); curId=project.scenes[0].id; wire(); resize(); refreshAll(); rafId=requestAnimationFrame(tick); micInit();
-  window.CutoutApp={get project(){ return project; },get mode(){ return mode; },get playing(){ return playing&&{id:playing.scene.id,t:playing.t,ended:playing.ended}; },get queue(){ return playQueue.length; },poseAt,livePose:id=>{ const p=live.get(id); return p&&{x:Math.round(p.x),y:Math.round(p.y)}; }};
+  window.CutoutApp={get project(){ return project; },get mode(){ return mode; },get playing(){ return playing&&{id:playing.scene.id,t:playing.t,ended:playing.ended}; },get queue(){ return playQueue.length; },poseAt,mats:(s,f,t,a)=>sceneMats(s,f,t,a),selName:()=>sel()&&nameOf(sel()),select:i=>{ selId=cur().items[i].id; updateItemBar(); },livePose:id=>{ const p=live.get(id); return p&&{x:Math.round(p.x),y:Math.round(p.y)}; }};
   const saved=await loadAuto();
   if(saved&&(saved.cast?.length||saved.pads?.length||saved.scenes?.some(s=>s.take||s.items?.length))){
     const when=saved.savedAt?new Date(saved.savedAt).toLocaleString():'earlier';
