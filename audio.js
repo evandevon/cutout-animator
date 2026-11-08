@@ -72,8 +72,11 @@ const Sound = (() => {
   function toBuffer(ctx,data){ const b=ctx.createBuffer(1,data.length,SR); b.copyToChannel(data,0);
     let p=0; for(let i=0;i<data.length;i+=7) p=Math.max(p,Math.abs(data[i])); if(p>.8){ const c=b.getChannelData(0),g=.8/p; for(let i=0;i<c.length;i++) c[i]*=g; } return b; }
 
+  /* Echo cancelling is off by default: on Windows it makes the browser a "phone call", and many
+     laptops then turn the speakers right down (or send sound only to headphones). */
+  const S={aec:false,sink:''};
   let ctx=null;
-  function audioCtx(){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); } if(ctx.state!=='running') ctx.resume().catch(()=>{}); return ctx; }
+  function audioCtx(){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); if(S.sink&&ctx.setSinkId) ctx.setSinkId(S.sink).catch(()=>{}); } if(ctx.state!=='running') ctx.resume().catch(()=>{}); return ctx; }
 
   const cache=new Map();
   /* ref: 'syn:rain' | 'mus:happy' | 'asset:<id>' */
@@ -124,7 +127,7 @@ const Sound = (() => {
   function micStart(deviceId){ if(mic.stream) return Promise.resolve(true); if(!micBusy) micBusy=micOpen(deviceId).finally(()=>micBusy=null); return micBusy; }
   async function micOpen(deviceId){
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) return false;
-    const c=audioCtx(), base={echoCancellation:true,noiseSuppression:true,autoGainControl:true};
+    const c=audioCtx(), base={echoCancellation:S.aec,noiseSuppression:S.aec,autoGainControl:true};
     try{ mic.stream=await navigator.mediaDevices.getUserMedia({audio:deviceId?{...base,deviceId:{exact:deviceId}}:base}); }
     catch(e){ if(!deviceId||e.name==='NotAllowedError') throw e; mic.stream=await navigator.mediaDevices.getUserMedia({audio:base}); } // that microphone has gone: use the default
     mic.src=c.createMediaStreamSource(mic.stream);
@@ -168,5 +171,8 @@ const Sound = (() => {
     let o=44; for(const c of chunks) for(let i=0;i<c.length;i++,o+=2){ const s=Math.max(-1,Math.min(1,c[i])); v.setInt16(o,s<0?s*32768:s*32767,true); }
     return new Blob([b],{type:'audio/wav'});
   }
-  return {wav,master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micCollect,micTake,micTakeTrimmed,micStop};
+  function setAec(v){ S.aec=!!v; }
+  function setSink(id){ S.sink=id||''; if(ctx&&ctx.setSinkId) ctx.setSinkId(S.sink).catch(()=>{}); }
+  function testTone(){ const c=audioCtx(),t=c.currentTime+.05; [523.25,659.25,783.99].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain(); o.type='triangle'; o.frequency.value=f; g.gain.setValueAtTime(0,t+i*.18); g.gain.linearRampToValueAtTime(.35,t+i*.18+.02); g.gain.exponentialRampToValueAtTime(.001,t+i*.18+.5); o.connect(g); g.connect(master(c)); o.start(t+i*.18); o.stop(t+i*.18+.55); }); }
+  return {get aec(){ return S.aec; },setAec,setSink,testTone,canPickOutput:typeof AudioContext!=='undefined'&&'setSinkId' in AudioContext.prototype,wav,master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micCollect,micTake,micTakeTrimmed,micStop};
 })();

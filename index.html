@@ -243,6 +243,11 @@
     <label class="check"><input type="checkbox" id="libToggle"> 🔊 Show the sound effect library</label>
     <label class="check"><input type="checkbox" id="bigUI"> 🔍 Big buttons, for the class board</label>
     <button id="fsBtn">⛶ Full screen</button>
+    <h3>Sound check</h3>
+    <button id="testSound">🔊 Play a test sound</button>
+    <label class="stack" id="outWrap" hidden>Play sound through <select id="outSel"></select></label>
+    <label class="check"><input type="checkbox" id="aecToggle"> Echo cancelling on the microphone</label>
+    <p class="hint">Can't hear the speakers? Leave echo cancelling off. On Windows, you can also open Sound settings › More sound settings › Communications and choose "Do nothing". Turn echo cancelling on only if recordings have the music in them twice.</p>
     <button id="newBtn">📄 New project</button>
     <button id="openBtn">📂 Open a project file</button>
     <button id="helpBtn">❓ How it works</button>
@@ -271,7 +276,7 @@
   <h3>Pinned cutouts</h3>
   <p>Tap a cutout and press <b>📌 Pinned</b> for things that are part of the place, like trees and houses. A pinned cutout stays put while recording, and taps go straight through it to the cutouts behind. You can still move it while setting up. Library buildings, trees and rocks start pinned. Tap 📌 again to unpin.</p>
   <h3>Sticking cutouts together</h3>
-  <p>Tap a cutout, press <b>🔗 Stick to…</b>, then tap what it should stick to, like a hat onto a head or a rider onto a horse. When the main one moves, turns or grows, the stuck one comes too. Moving the stuck one only moves itself. Pin the stuck one too (📌) and grabbing it moves the main one instead. Press 🔗 again to unstick.</p>
+  <p>Tap a cutout, press <b>🔗 Stick to…</b>, then tap what it should stick to, like a hat onto a head or a rider onto a horse. The main one gets a yellow 🔗 circle in its middle: drag that circle to move it with everything stuck to it. Dragging anywhere else moves just that one cutout. If the main one turns, grows or hops, the stuck ones go with it. Pin the stuck one too (📌) and grabbing it moves the whole group. Press 🔗 again to unstick.</p>
   <h3>Moving cutouts</h3>
   <p>Drag to move, with a finger or the mouse. Pinch with two fingers, or use the round handle or mouse wheel, to resize and turn. Hold Shift with the wheel to turn. Double-tap to flip.</p>
   <h3>Keyboard</h3>

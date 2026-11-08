@@ -60,6 +60,7 @@ select,#askInput,#projName,#sfxName{font:inherit;min-height:var(--tap);padding:.
 #sfxLib details{border-top:1px solid var(--check);padding:.35rem 0}#sfxLib summary{font-weight:700;font-size:.95rem;min-height:2rem;cursor:pointer}
 .libItems{display:flex;flex-direction:column}.libRow{display:flex;align-items:center;gap:.35rem}.libRow .check{flex:1}.libPrev{min-height:2.2rem!important;min-width:2.4rem;padding:0!important;box-shadow:none!important;border-width:2px!important}
 .libItems .check{min-height:2.4rem;font-size:.9rem}
+.menuBtns h3{margin:.6rem 0 0;font-size:1rem}.menuBtns .hint{margin:0}
 .menuBtns .btn{text-align:center}
 .tplTools{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;flex:none}#tplStatus{font-weight:700}
 #tplCam{display:flex;gap:.6rem;flex:none;height:min(38vh,24rem)}#tplVideo{height:100%;min-width:0;flex:1;background:#222;border-radius:.5rem;object-fit:contain;width:50%}

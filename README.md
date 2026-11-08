@@ -13,7 +13,7 @@ It runs entirely in the browser. Photos and recordings stay on the device: nothi
 1. Go to <https://evandevon.github.io/cutout-animator/>.
 2. **Add a drawing.** Take a photo, choose a picture or paste one. White paper is removed automatically. Tidy up with Draw around, Erase, Add and Tap to remove.
 3. **Or use the library.** Choose ready-made people, animals, buildings, vehicles and more from the Cutouts tab.
-4. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Press **📌 Pinned** for things that are part of the place, like trees and houses: a pinned cutout stays put while recording, and taps go through it to the cutouts behind. Library buildings, trees and rocks start pinned. Press **🔗 Stick to…** and tap another cutout to stick them together, like a hat onto a head: when the main one moves, the stuck one comes too. Park cutouts in the dark "off stage" areas at the sides so they can walk on later.
+4. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Press **📌 Pinned** for things that are part of the place, like trees and houses: a pinned cutout stays put while recording, and taps go through it to the cutouts behind. Library buildings, trees and rocks start pinned. Press **🔗 Stick to…** and tap another cutout to stick them together, like a hat onto a head. Drag the yellow 🔗 circle in the middle of the main one to move them together; dragging anywhere else moves just that cutout. Park cutouts in the dark "off stage" areas at the sides so they can walk on later.
 5. **Check the microphone.** The meter beside the Record button shows your volume, and the dropdown chooses a microphone if there's more than one.
 6. **Record.** Your voice, the chosen sounds and every movement are recorded. Drag with a finger or the mouse. On a touch screen, several fingers can move different cutouts at once, and pinching resizes and turns a cutout.
 7. **Teach a move (optional).** Tap a cutout, press Teach a move, drag it and let go. It repeats that move during recording. Grab it and it follows you, then glides back to where you grabbed it and carries on.
@@ -49,6 +49,7 @@ The app records movement data and audio, not screen video. Toolbars stay out of 
 
 - Use the HTTPS address above. Camera and microphone don't work from a `file://` page.
 - Video is made frame by frame where the browser can encode it directly, so slow computers just take longer and the result is the same, even if you switch tabs. Older browsers, including older iPad Safari, can only record it in real time with the tab showing: it pauses and restarts if the tab is hidden, and may look jumpy on slow devices.
+- No sound from the speakers? Check **Sound check** in the ☰ menu: play a test sound, pick the speakers, and keep echo cancelling off. On Windows, echo cancelling can make the computer treat it as a phone call and turn the speakers down.
 - Headphones give the cleanest voice recording, because the microphone can't pick up the music.
 
 ## Credits

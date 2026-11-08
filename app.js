@@ -131,8 +131,10 @@ function render(){
     // links: shown only for the selected cutout and whatever it is stuck to, to keep the stage tidy
     for(const s of scene.items){ if(!s.link||(s.id!==selId&&s.link!==selId)) continue; const e=mats.get(s.id),f=mats.get(s.link); if(!e||!f) continue; const a=centreOf(e),b=centreOf(f);
       ctx.setLineDash([10*px,7*px]); ctx.lineWidth=4*px; ctx.strokeStyle='#2a2320'; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); ctx.lineWidth=2*px; ctx.strokeStyle='#ffe08a'; ctx.stroke(); ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(b[0],b[1],7*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.stroke(); badge(a[0],a[1],'🔗','#ffe08a'); }
+      ctx.beginPath(); ctx.arc(a[0],a[1],7*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.stroke(); }
     if(linkPick){ ctx.font=`${Math.round(24*px)}px sans-serif`; for(const o of linkCands()){ const e=mats.get(o.id); if(!e) continue; const [x,y]=centreOf(e); ctx.beginPath(); ctx.arc(x,y,28*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } } }
+  if((mode==='setup'||mode==='rec'||mode==='count')&&!linkPick){ ctx.font=`${Math.round(22*px)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; const held=new Set([...grabs.values()].filter(g=>g.group).map(g=>g.id));
+    for(const s of scene.items){ if(!scene.items.some(o=>o.link===s.id)) continue; const e=mats.get(s.id); if(!e) continue; const [x,y]=centreOf(e),on=held.has(s.id); ctx.beginPath(); ctx.arc(x,y,(on?26:22)*px,0,7); ctx.fillStyle=on?'#fff3c4':'#ffe08aee'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } }
   const it=sel();
   if(it&&mode!=='play'){ const c=cornersOf(mats.get(it.id)); if(c){ ctx.setLineDash([8*px,6*px]); ctx.lineWidth=2*px; ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(...c.tl); ctx.lineTo(...c.tr); ctx.lineTo(...c.br); ctx.lineTo(...c.bl); ctx.closePath(); ctx.stroke(); ctx.strokeStyle='#000'; ctx.lineDashOffset=8*px; ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset=0;
       if(!linkPick){ ctx.beginPath(); ctx.arc(c.tr[0],c.tr[1],13*px,0,7); ctx.fillStyle='#0b6e6e'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.strokeStyle='#fff'; ctx.stroke(); } } }
@@ -143,7 +145,8 @@ const live=new Map(); let rec=null; const grabs=new Map();
 const world=e=>{ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)/r.width*VW-MX,(e.clientY-r.top)/r.height*VH-MY]; };
 /* Scenery can't be grabbed while recording, so taps go through to the cutouts behind it.
    While setting up, movable cutouts are picked first and scenery only if nothing else is there. */
-function hit(x,y){ const mats=matsNow(); return hitAny(x,y,false,mats)||(mode==='setup'?hitAny(x,y,true,mats):null); }
+let hitGroup=false;
+function hit(x,y){ hitGroup=false; const mats=matsNow(); return hitAny(x,y,false,mats)||(mode==='setup'?hitAny(x,y,true,mats):null); }
 function pixelHit(e,x,y){ if(!e||!e.im) return false; const [lx,ly]=mapp(minv(e.m),x,y),w=e.im.naturalWidth,h=e.im.naturalHeight,pad=10/Math.max(.01,Math.hypot(e.m[2],e.m[3]));
   if(Math.abs(lx)>w/2+pad||Math.abs(ly)>h/2+pad) return false; const hm=hitMaps.get(e.it.assetId); if(!hm) return true;
   const u=(lx/w+.5)*hm.w|0,v=(ly/h+.5)*hm.h|0; for(let b=-2;b<=2;b++)for(let a=-2;a<=2;a++){ const X=u+a,Y=v+b; if(X>=0&&Y>=0&&X<hm.w&&Y<hm.h&&hm.d[(Y*hm.w+X)*4+3]>40) return true; } return false; }
@@ -152,7 +155,7 @@ function hitAny(x,y,scenery,mats){
   const items=cur().items; for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(!pixelHit(mats.get(it.id),x,y)) continue;
     if(scenery){ if(it.fixed) return it; continue; }
     if(!it.fixed) return it;
-    if(mode==='rec'){ const m=movableMaster(it); if(m) return m; } } // a pinned cutout stuck to another hands the tap to its master
+    if(mode==='rec'){ const m=movableMaster(it); if(m){ hitGroup=true; return m; } } } // a pinned cutout stuck to another hands the tap to its master
   return null;
 }
 function target(it){ if(mode==='rec'){ touchRec(it); return live.get(it.id); } return it; }
@@ -161,6 +164,15 @@ function parentMat(it){ if(!it.link) return I6; const e=matsNow().get(it.id); re
 function centreW(it,p){ return mapp(parentMat(it),p.x,p.y); }
 function placeCentre(it,p,wx,wy){ const [x,y]=mapp(minv(parentMat(it)),wx,wy); p.x=x; p.y=y; }
 const turnSign=it=>mdet(parentMat(it))<0?-1:1;
+/* Moving a master on its own: the cutouts stuck to it stay where they are on the stage.
+   (Grab the 🔗 circle in its middle to take them along.) */
+function keepKids(it,change){ const sc=cur(),kids=sc.items.filter(o=>o.link===it.id); if(!kids.length){ change(); return; }
+  const before=sceneMats(sc,poseNow,0,false),Wk=kids.map(k=>before.get(k.id).m); change();
+  const e=sceneMats(sc,poseNow,0,false).get(it.id); if(!e) return; const Pi=minv(e.m);
+  kids.forEach((k,i)=>{ if([...grabs.values()].some(g=>g.id===k.id)) return; const q=target(k),d=mdecomp(mmul(Pi,Wk[i])); q.x=d.x; q.y=d.y; q.s=d.s; q.r=d.r-(q.tilt||0); q.flip=d.flip; }); }
+const hasKids=it=>cur().items.some(o=>o.link===it.id);
+function chainAt(x,y,touch){ if(mode!=='setup'&&mode!=='rec') return null; const mats=matsNow(),items=cur().items,R=(touch?34:26)/vs*dpr; for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(!hasKids(it)) continue; const e=mats.get(it.id); if(!e) continue; const [cx,cy]=centreOf(e); if(Math.hypot(x-cx,y-cy)<R) return it; } return null; }
+const groupGrab=id=>[...grabs.values()].some(g=>g.id===id&&g.group);
 function clampFor(it,p){ if(it.link) p.s=clamp(p.s,.005,60); else clampPose(p); }
 function clampPose(p){ p.x=clamp(p.x,-MX+20,W+MX-20); p.y=clamp(p.y,-MY+20,H+MY-20); p.s=clamp(p.s,.03,8); }
 let setupMoved=false,teach=null,linkPick=null;
@@ -177,7 +189,7 @@ function pickLink(x,y){ const child=cur().items.find(i=>i.id===linkPick.id),mats
   for(const o of cands){ const e=mats.get(o.id); if(!e) continue; const [cx,cy]=centreOf(e),d=Math.hypot(x-cx,y-cy); if(d<bd){ bd=d; best=o; } }
   if(!best) for(let i=cur().items.length-1;i>=0;i--){ const o=cur().items[i]; if(cands.includes(o)&&pixelHit(mats.get(o.id),x,y)){ best=o; break; } }
   linkCancel(); if(!best||!child) return; checkpoint(); relink(cur(),child,best.id); selId=child.id; updateItemBar(); dirty();
-  toast(nameOf(child)+' is stuck to '+nameOf(best)+'. Move '+nameOf(best)+' and '+nameOf(child)+' comes too.',3200); }
+  toast(nameOf(child)+' is stuck to '+nameOf(best)+'. Drag the 🔗 in the middle of '+nameOf(best)+' to move them together.',3600); }
 /* Change what a cutout is stuck to without it jumping: its pose, recorded movement and taught move are
    converted from the old master's space to the new one's. */
 function relink(scene,it,to){
@@ -207,22 +219,26 @@ cv.addEventListener('pointerdown',e=>{
   const [x,y]=world(e); setupMoved=false;
   if(linkPick){ pickLink(x,y); return; }
   const s=sel(); if(s&&!grabs.size&&!teach){ const c=cornersOf(matsNow().get(s.id)); if(c&&Math.hypot(x-c.tr[0],y-c.tr[1])<(e.pointerType==='touch'?34:24)/vs*dpr){ const p=poseNow(s),[cx,cy]=centreW(s,p); grabs.set(e.pointerId,{id:s.id,kind:'handle',x,y,d0:Math.hypot(x-cx,y-cy)||1,a0:Math.atan2(y-cy,x-cx),s0:p.s,r0:p.r,moved:true}); return; } }
+  const ch=!teach&&chainAt(x,y,e.pointerType==='touch');
+  if(ch){ selId=ch.id; updateItemBar(); grabs.set(e.pointerId,{id:ch.id,kind:'drag',group:true,x,y,sx:x,sy:y,t:performance.now(),moved:false,ox:0,oy:0}); rebase(ch.id); return; }
   let it=hit(x,y);
   if(!it&&mode==='setup'&&grabs.size===1){ const g=[...grabs.values()][0]; it=cur().items.find(i=>i.id===g.id)||null; }
   if(!it){ if(!grabs.size){ selId=null; updateItemBar(); } return; }
   if(teach&&it.id!==teach.id) return;
   selId=it.id; updateItemBar(); if(teach&&!teach.active&&mode==='setup'){ checkpoint(); setupMoved=true; Object.assign(teach,{active:true,t0:performance.now(),lastT:-1,frames:[],start:{x:it.x,y:it.y,s:it.s,r:it.r}}); }
-  grabs.set(e.pointerId,{id:it.id,kind:'drag',x,y,sx:x,sy:y,t:performance.now(),moved:false,ox:0,oy:0}); rebase(it.id);
+  grabs.set(e.pointerId,{id:it.id,kind:'drag',group:hitGroup,x,y,sx:x,sy:y,t:performance.now(),moved:false,ox:0,oy:0}); rebase(it.id);
 });
 cv.addEventListener('pointermove',e=>{
   const g=grabs.get(e.pointerId); if(!g) return; e.preventDefault(); const [x,y]=world(e); g.x=x; g.y=y;
   const it=cur().items.find(i=>i.id===g.id); if(!it) return;
-  if(g.kind==='handle'){ beforeMove(); const p=target(it),[cx,cy]=centreW(it,p); p.s=g.s0*Math.hypot(x-cx,y-cy)/g.d0; p.r=g.r0+(Math.atan2(y-cy,x-cx)-g.a0)*turnSign(it); clampFor(it,p); dirtyIf(); return; }
+  if(g.kind==='handle'){ beforeMove(); keepKids(it,()=>{ const p=target(it),[cx,cy]=centreW(it,p); p.s=g.s0*Math.hypot(x-cx,y-cy)/g.d0; p.r=g.r0+(Math.atan2(y-cy,x-cx)-g.a0)*turnSign(it); clampFor(it,p); }); dirtyIf(); return; }
   if(!g.moved&&Math.hypot(x-g.sx,y-g.sy)>4) g.moved=true; if(!g.moved) return;
-  const pts=[...grabs.values()].filter(q=>q.id===g.id); beforeMove(); const p=target(it);
-  if(pts.length>=2&&it.__g){ const [a,b]=pts,G=it.__g; p.s=G.s*Math.hypot(a.x-b.x,a.y-b.y)/G.d; p.r=G.r+(Math.atan2(b.y-a.y,b.x-a.x)-G.a)*turnSign(it); placeCentre(it,p,G.cx+(a.x+b.x)/2-G.mx,G.cy+(a.y+b.y)/2-G.my); }
-  else placeCentre(it,p,x+g.ox,y+g.oy);
-  clampFor(it,p); dirtyIf();
+  const pts=[...grabs.values()].filter(q=>q.id===g.id); beforeMove();
+  const move=()=>{ const p=target(it);
+    if(pts.length>=2&&it.__g){ const [a,b]=pts,G=it.__g; p.s=G.s*Math.hypot(a.x-b.x,a.y-b.y)/G.d; p.r=G.r+(Math.atan2(b.y-a.y,b.x-a.x)-G.a)*turnSign(it); placeCentre(it,p,G.cx+(a.x+b.x)/2-G.mx,G.cy+(a.y+b.y)/2-G.my); }
+    else placeCentre(it,p,x+g.ox,y+g.oy);
+    clampFor(it,p); };
+  if(groupGrab(it.id)) move(); else keepKids(it,move); dirtyIf();
 });
 function dirtyIf(){ if(mode==='setup') dirty(); }
 function endPtr(e){
@@ -230,9 +246,9 @@ function endPtr(e){
   if(g.kind==='drag'&&!g.moved&&performance.now()-g.t<320){ const n=performance.now(); if(lastTap.id===g.id&&n-lastTap.t<340){ flip(); lastTap={t:0,id:null}; } else lastTap={t:n,id:g.id}; }
 }
 cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',endPtr);
-cv.addEventListener('wheel',e=>{ if(mode==='play'||mode==='count') return; const [x,y]=world(e),it=hit(x,y)||sel(); if(!it) return; e.preventDefault(); selId=it.id; updateItemBar(); if(mode==='setup'&&!cv.__wheel){ checkpoint(); cv.__wheel=setTimeout(()=>cv.__wheel=0,500); } const p=target(it); if(e.shiftKey) p.r+=e.deltaY*.0025; else { p.s=clamp(p.s*Math.exp(-e.deltaY*.0012),.03,8); } dirtyIf(); },{passive:false});
+cv.addEventListener('wheel',e=>{ if(mode==='play'||mode==='count') return; const [x,y]=world(e),it=hit(x,y)||sel(); if(!it) return; e.preventDefault(); selId=it.id; updateItemBar(); if(mode==='setup'&&!cv.__wheel){ checkpoint(); cv.__wheel=setTimeout(()=>cv.__wheel=0,500); } keepKids(it,()=>{ const p=target(it); if(e.shiftKey) p.r+=e.deltaY*.0025; else p.s=clamp(p.s*Math.exp(-e.deltaY*.0012),.005,60); }); dirtyIf(); },{passive:false});
 
-function flip(){ const it=sel(); if(!it) return; if(mode==='setup') checkpoint(); const p=target(it); p.flip=!p.flip; dirtyIf(); }
+function flip(){ const it=sel(); if(!it) return; if(mode==='setup') checkpoint(); keepKids(it,()=>{ const p=target(it); p.flip=!p.flip; }); dirtyIf(); }
 
 /* ---------- recording ---------- */
 const recTime=()=>Sound.audioCtx().currentTime-rec.t0;
@@ -558,6 +574,14 @@ function wire(){
   Template.init({toast,onAdd:importSheets});
   Library.init({onPick:async item=>{ checkpoint(); let a=Object.values(project.assets).find(x=>x.libId===item.id&&x.kind==='cutout'); if(!a){ const c=await Library.toCutout(item); a=addAsset('cutout',c.blob,item.name,c.w,c.h); a.libId=item.id; await loadImg(a); } if(!project.cast.includes(a.id)) project.cast.push(a.id); const it=placeCutout(a); it.anim=item.alive?'sway':null; if(item.scenery) it.fixed=true; updateItemBar(); renderCast(); updateItemBar(); dirty(); toast(item.name+' added to the stage.',1500); }});
   $('addLibrary').onclick=()=>Library.open(); $('startLib').onclick=()=>Library.open(); $('startDraw').onclick=()=>Cut.open('cutout');
+  const pref=(k,v)=>{ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }catch(_){ return null; } };
+  Sound.setAec(pref('ca-aec')==='1'); $('aecToggle').checked=Sound.aec;
+  $('aecToggle').onchange=async e=>{ pref('ca-aec',e.target.checked?'1':''); Sound.setAec(e.target.checked); if(Sound.mic.stream){ Sound.micStop(); await micOn(); } };
+  const fillOut=async()=>{ if(!Sound.canPickOutput||!navigator.mediaDevices?.enumerateDevices) return; const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audiooutput'&&d.deviceId!=='communications'),s=$('outSel'); s.innerHTML=''; ds.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId==='default'?'':d.deviceId; o.textContent=d.deviceId==='default'?'Computer default':(d.label||'Speaker '+(i+1)); s.append(o); }); s.value=pref('ca-out')||''; if(s.selectedIndex<0) s.value=''; $('outWrap').hidden=ds.length<2; };
+  if(pref('ca-out')) Sound.setSink(pref('ca-out'));
+  $('outSel').onchange=e=>{ pref('ca-out',e.target.value); Sound.setSink(e.target.value); Sound.testTone(); };
+  $('testSound').onclick=()=>Sound.testTone();
+  $('menuBtn').addEventListener('click',fillOut);
   const setLib=v=>{ $('sfxLibWrap').hidden=!v; $('libToggle').checked=v; try{ localStorage.setItem('ca-sfxlib',v?'1':''); }catch(_){} if(!v) stopLibPreview(); };
   try{ setLib(localStorage.getItem('ca-sfxlib')==='1'); }catch(_){ setLib(false); } $('libToggle').onchange=e=>setLib(e.target.checked);
   const setBig=v=>{ document.documentElement.classList.toggle('bigUI',v); $('bigUI').checked=v; try{ localStorage.setItem('ca-big',v?'1':''); }catch(_){} resize(); };
@@ -612,8 +636,11 @@ function wire(){
     if(e.key==='Tab'&&document.activeElement===cv){ const it=cur().items.filter(x=>mode!=='rec'||!x.fixed); if(it.length){ e.preventDefault(); const i=it.findIndex(x=>x.id===selId); selId=it[(i+(e.shiftKey?-1:1)+it.length)%it.length].id; updateItemBar(); } return; }
     const it=sel(); if(!it) return; const st=e.shiftKey?40:10; let done=true; const once=()=>{ if(mode==='setup'&&!e.repeat) checkpoint(); return target(it); };
     const nudge=(dx,dy)=>{ const q=once(),[cx,cy]=centreW(it,q); placeCentre(it,q,cx+dx,cy+dy); };
-    switch(e.key){ case 'ArrowLeft': nudge(-st,0); break; case 'ArrowRight': nudge(st,0); break; case 'ArrowUp': nudge(0,-st); break; case 'ArrowDown': nudge(0,st); break; case '[': once().s*=.94; break; case ']': once().s*=1.06; break; case ',': once().r-=.08; break; case '.': once().r+=.08; break; case 'f': case 'F': flip(); break; case 'Delete': case 'Backspace': if(mode==='setup') removeSel(); break; default: done=false; }
-    if(done){ e.preventDefault(); const p=mode==='rec'?live.get(it.id):it; if(p) clampFor(it,p); dirtyIf(); }
+    if(e.key==='f'||e.key==='F'){ flip(); e.preventDefault(); return; }
+    if(e.key==='Delete'||e.key==='Backspace'){ if(mode==='setup') removeSel(); e.preventDefault(); return; }
+    keepKids(it,()=>{ switch(e.key){ case 'ArrowLeft': nudge(-st,0); break; case 'ArrowRight': nudge(st,0); break; case 'ArrowUp': nudge(0,-st); break; case 'ArrowDown': nudge(0,st); break; case '[': once().s*=.94; break; case ']': once().s*=1.06; break; case ',': once().r-=.08; break; case '.': once().r+=.08; break; case 'f': case 'F': flip(); break; case 'Delete': case 'Backspace': if(mode==='setup') removeSel(); break; default: done=false; }
+    if(done){ const p=mode==='rec'?live.get(it.id):it; if(p) clampFor(it,p); } });
+    if(done){ e.preventDefault(); dirtyIf(); }
   });
   window.addEventListener('beforeunload',()=>{ clearTimeout(saveT); });
 }
