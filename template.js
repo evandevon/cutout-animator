@@ -131,7 +131,7 @@ const Template=(()=>{
       btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); },ch.rect); const cap=(ch.anim?ANIM.find(a=>a[0]===ch.anim)[1]:'Still')+(ch.over?' · past the box':''); const f=fig(cap,btn); if(ch.over){ f.classList.add('over'); btn.title='This drawing went past its box. Tap to check it.'; } });
     if(s.script) fig('Script',canvasThumb(s.script,'wideimg'));
     row.append(w);
-    const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);
+    const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background sound: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);
     $('tplRows').append(row);
   }
   function stopCam(){ clearInterval(camT); if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('tplVideo').srcObject=null; $('tplCam').hidden=true; }

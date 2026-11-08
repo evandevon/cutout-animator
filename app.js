@@ -523,7 +523,7 @@ function wire(){
   $('playBtn').onclick=()=>play([cur()]); $('playAllBtn').onclick=()=>play(project.scenes);
   $('projName').oninput=e=>{ project.name=e.target.value; dirty(); };
   $('itFlip').onclick=flip;
-  $('itFixed').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.fixed=!it.fixed; updateItemBar(); dirty(); toast(it.fixed?'Scenery: stays put while recording, and taps go through it.':'Movable: you can drag it while recording.',2400); };
+  $('itFixed').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.fixed=!it.fixed; updateItemBar(); dirty(); toast(it.fixed?'Pinned: it stays put while recording, and taps go through it.':'Not pinned: you can drag it while recording.',2400); };
   $('itLoop').onclick=()=>{ const it=sel(); if(!it) return; if(it.loop){ checkpoint(); it.loop.on=!it.loop.on; updateItemBar(); dirty(); } else teachStart(); };
   $('itLoopRedo').onclick=teachStart;
   document.querySelectorAll('[data-anim]').forEach(b=>b.onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); const v=b.dataset.anim; it.anim=it.anim===v?null:v; updateItemBar(); dirty(); toast(it.anim?b.getAttribute('aria-label'):'No animation',1000); });

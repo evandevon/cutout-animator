@@ -13,7 +13,7 @@ It runs entirely in the browser. Photos and recordings stay on the device: nothi
 1. Go to <https://evandevon.github.io/cutout-animator/>.
 2. **Add a drawing.** Take a photo, choose a picture or paste one. White paper is removed automatically. Tidy up with Draw around, Erase, Add and Tap to remove.
 3. **Or use the library.** Choose ready-made people, animals, buildings, vehicles and more from the Cutouts tab.
-4. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Press **📌 Scenery** for things that are part of the place, like trees and houses: scenery stays put while recording, and taps go through it to the cutouts behind. Park cutouts in the dark area outside the frame so they can walk on later.
+4. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Press **📌 Pinned** for things that are part of the place, like trees and houses: a pinned cutout stays put while recording, and taps go through it to the cutouts behind. Library buildings, trees and rocks start pinned. Park cutouts in the dark area outside the frame so they can walk on later.
 5. **Check the microphone.** The meter beside the Record button shows your volume, and the dropdown chooses a microphone if there's more than one.
 6. **Record.** Your voice, the chosen sounds and every movement are recorded. Drag with a finger or the mouse. On a touch screen, several fingers can move different cutouts at once, and pinching resizes and turns a cutout.
 7. **Teach a move (optional).** Tap a cutout, press Teach a move, drag it and let go. It repeats that move during recording. Grab it and it follows you, then glides back to where you grabbed it and carries on.
@@ -26,7 +26,7 @@ Work also autosaves on the device and is offered back next time the page opens.
 
 ## Templates for a whole class
 
-1. Print the [template](templates/cutout-template-A4.pdf). It's A4, so print it at A3 size if you want more room to draw. Each sheet has a background box, four character boxes with movement ticks, a script area, background sound and music ticks, and a space to write down the sound effects to record.
+1. Print the [template](templates/cutout-template-A4.pdf). It's A4, so print it at A3 size if you want more room to draw. Each sheet has a backdrop box, four character boxes with movement ticks, a script area, background sound and music ticks, and a space to write down the sound effects to record.
 2. Students fill them in. Dark pens and bright colours work best.
 3. Scan the sheets, then in the ☰ menu choose **Add filled-in templates**. Select JPGs or PDFs with one sheet per page, or use the webcam. Sheets can be crooked or upside down, as long as all four corner squares show.
 4. Check the results, tap a cutout to fix it, and press **Add scenes**. Each sheet becomes one scene. The handwritten script shows on screen during recording.

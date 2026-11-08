@@ -7,7 +7,7 @@ W,H=297,210
 BG=(10,22,160,90); SCRIPT=(10,118,160,70)
 CHARS=[(176,22,53,38),(234,22,53,38),(176,72,53,38),(234,72,53,38)]
 COLS=[176,201]; rowy=lambda i:128+i*9.5
-LISTS=[('Background',['Rain','Wind','Ocean','Forest']),('Music',['Happy','Adventure','Spooky','Sleepy'])]
+LISTS=[('Background sound',['Rain','Wind','Ocean','Forest']),('Music',['Happy','Adventure','Spooky','Sleepy'])]
 SOUNDS=(228,121,59,67)
 GREY=HexColor('#b5b5b5'); TEXT=HexColor('#555555')
 def make(path,size):
@@ -22,20 +22,21 @@ def make(path,size):
         if i==0: c.setFillColor(white); c.rect(X(cx-2),Y(cy+2),S(4),S(4),stroke=0,fill=1)
     text(24,15,'Name: ______________________',11,True,black); text(120,15,'Scene: ______',11,True,black)
     text(165,15,'Use dark pens and bright colours. Stay inside the boxes.',8)
-    text(10,20.8,'Background: draw the whole picture to the edges',8.5,True)
+    text(10,20.8,'Backdrop: draw the whole picture to the edges',8.5,True)
     rect(*BG); rect(*SCRIPT); text(10,116.8,'My script: what will you say?',8.5,True)
     for i,(x,y,w,h) in enumerate(CHARS):
         text(x,y-1.2,f'Character {i+1}',8.5,True); rect(x,y,w,h)
         for dx,lab in zip([0,13.5,27,40.5],['Sway','Hop','Float','Spin']):
             rect(x+dx,y+39.5,5,5,.7); text(x+dx+6,y+43.4,lab,7.5)
     for col,(title,items) in zip(COLS,LISTS):
-        text(col,125,title,8.5,True)
+        if title=='Background sound': text(col,121.4,'Background',8.5,True); text(col,125,'sound',8.5,True)
+        else: text(col,125,title,8.5,True)
         for i,t in enumerate(items):
             rect(col,rowy(i),6,6,.7); text(col+7.5,rowy(i)+4.6,t,9)
     x,y,w,h=SOUNDS; text(x,y-1.2,"Sounds I'll make",8.5,True); rect(x,y,w,h)
     text(x+2,y+5,'Write or draw each sound effect.',7)
     for i in range(6): c.setStrokeColor(HexColor('#dddddd')); c.setLineWidth(.4*k*2.83); c.line(X(x+3),Y(y+16+i*9),X(x+w-3),Y(y+16+i*9))
-    text(24,200,'Tick one background and one music. Tick how each character moves, or none to keep it still.',8)
+    text(24,200,'Tick one background sound and one music. Tick how each character moves, or none to keep it still.',8)
     text(150,200,'evandevon.github.io/cutout-animator',8)
     c.showPage(); c.save()
 make('templates/cutout-template-A4.pdf',(297,210))
