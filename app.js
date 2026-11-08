@@ -263,6 +263,7 @@ async function startRecording(layer){
   voiceWanted=$('voiceOn').checked; micOK=false;
   micHold=0; micPaused=false; clearTimeout(micBackT);
   if(voiceWanted){ await micOn(); micOK=!!Sound.mic.stream; if(!micOK) toast("The microphone isn't available, so this recording has no voice."); }
+  else if(Sound.mic.stream){ Sound.micStop(); micUI(); } // no voice wanted: free the microphone so Windows doesn't mute the sounds
   mode='count'; setLive(true); $('countdown').hidden=false;
   const buf=await preload(scene); for(const r of scenePads(scene)) Sound.buffer(r,project.assets).catch(()=>{});
   for(const n of [3,2,1]){ $('countdown').textContent=n; await new Promise(r=>setTimeout(r,700)); }
@@ -317,7 +318,7 @@ function finishTake(){
   if(stopAudio){ stopAudio(); stopAudio=null; }
   grabs.clear(); rec=null; live.clear();
 }
-function stopRecording(){ if(mode==='count') return; if(mode!=='rec') return; finishTake(); micOK=false; mode='setup'; if(!keepMic()){ Sound.micStop(); micUI(); } setLive(false); refreshAll(); dirty(); toast('Recorded! Press Play to watch it.'); }
+function stopRecording(){ if(mode==='count') return; if(mode!=='rec') return; finishTake(); micOK=false; mode='setup'; if(!keepMic()){ Sound.micStop(); micUI(); } else if(!Sound.mic.stream) micOn(); setLive(false); refreshAll(); dirty(); toast('Recorded! Press Play to watch it.'); }
 async function nextScene(){ if(mode!=='rec'||!nextOpen()) return; const i=project.scenes.indexOf(cur()); finishTake(); const n=project.scenes[i+1]; curId=n.id; selId=null; mode='count'; const buf=await preload(n); renderScenes(); showScript(); renderPads(); beginTake(n,false,buf); }
 function showScript(){ const s=cur(),a=(mode==='rec'||mode==='count')&&s.script&&project.assets[s.script],v=$('scriptView'); v.hidden=!a; if(a){ if(!a.__u) a.__u=URL.createObjectURL(a.blob); $('scriptImg').src=a.__u; } }
 function setLive(on){ document.body.classList.toggle('live',on); showScript(); renderPads(); $('transport').hidden=on; $('recBar').hidden=!on; $('stopBtn').querySelector('.sq').hidden=false; $('stopBtn').lastChild.textContent=' Stop'; $('timer').hidden=false; $('micLevelWrap').hidden=!micOK; $('nextSceneBtn').hidden=true; $('timer').textContent='0:00'; resize(); }
@@ -343,7 +344,8 @@ async function micInit(){ if(!keepMic()){ micUI(); return; } let st='prompt'; tr
 
 /* ---------- playback ---------- */
 let playing=null,playQueue=[];
-async function play(scenes){
+let playRel=null,expRel=null;
+async function play(scenes){ if(mode==='setup'&&scenes.some(s=>s.take)) playRel=quiet();
   if(mode!=='setup') return; playQueue=scenes.filter(s=>s.take); if(!playQueue.length) return; Sound.audioCtx(); mode='play'; selId=null; updateItemBar(); setLive(true); await playNext();
 }
 async function playNext(){
@@ -352,7 +354,7 @@ async function playNext(){
   stopAudio=Sound.schedule(c,Sound.master(c),scene,t0,buf,mixNow(),{dur:scene.take.dur,withTake:true});
   playing={scene,t0,t:0};
 }
-function stopPlay(){ if(stopAudio){ stopAudio(); stopAudio=null; } playing=null; playQueue=[]; mode='setup'; setLive(false); refreshAll(); }
+function stopPlay(){ if(playRel){ playRel(); playRel=null; } if(stopAudio){ stopAudio(); stopAudio=null; } playing=null; playQueue=[]; mode='setup'; setLive(false); refreshAll(); }
 
 function tick(now){
   rafId=requestAnimationFrame(tick); const dt=Math.min(.1,(now-lastTick)/1000||.016); lastTick=now;
@@ -634,7 +636,8 @@ function wire(){
   $('newBtn').onclick=async()=>{ $('menuDlg').close(); if(!await ask('Start a new project?','Anything you have not saved as a project file will be lost.',[['Cancel',null],['Start new',1,'danger']])) return; await adopt(newProject()); undoStack=[]; redoStack=[]; refreshAll(); autosave(); };
   $('saveBtn').onclick=saveProject; $('openBtn').onclick=()=>{ $('menuDlg').close(); $('openInput').click(); }; $('openInput').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) openProject(f); };
   $('scriptView').onclick=()=>$('scriptView').hidden=true; $('tplBtn').onclick=()=>{ $('menuDlg').close(); Template.open(); }; $('menuBtn').onclick=()=>$('menuDlg').showModal(); $('menuClose').onclick=()=>$('menuDlg').close(); $('helpBtn').onclick=()=>{ $('menuDlg').close(); $('helpDlg').showModal(); }; $('helpClose').onclick=()=>$('helpDlg').close();
-  $('exportBtn').onclick=()=>{ const ss=project.scenes.filter(s=>s.take); if(!ss.length){ toast('Record a scene first.'); return; } const skipped=project.scenes.length-ss.length; $('expInfo').textContent=`${ss.length} scene${ss.length>1?'s':''}, ${fmt(ss.reduce((a,s)=>a+s.take.dur,0))} long.`+(skipped?` ${skipped} scene${skipped>1?'s have':' has'} no recording and will be skipped.`:''); $('expKindWrap').hidden=ss.length<2; document.querySelector('input[name=expKind][value=all]').checked=true; $('expSetup').hidden=false; $('expRun').hidden=true; $('expDone').hidden=true; $('exportDlg').showModal(); };
+  $('exportBtn').onclick=()=>{ const ss=project.scenes.filter(s=>s.take); if(!ss.length){ toast('Record a scene first.'); return; } const skipped=project.scenes.length-ss.length; $('expInfo').textContent=`${ss.length} scene${ss.length>1?'s':''}, ${fmt(ss.reduce((a,s)=>a+s.take.dur,0))} long.`+(skipped?` ${skipped} scene${skipped>1?'s have':' has'} no recording and will be skipped.`:''); $('expKindWrap').hidden=ss.length<2; document.querySelector('input[name=expKind][value=all]').checked=true; $('expSetup').hidden=false; $('expRun').hidden=true; $('expDone').hidden=true; $('exportDlg').showModal(); expRel=quiet(); };
+  $('exportDlg').addEventListener('close',()=>{ if(expRel){ expRel(); expRel=null; } });
   $('expCancelRun').onclick=()=>{ expCancel=true; $('expCancelRun').disabled=true; $('expStatus').textContent='Stopping…'; }; $('exportDlg').addEventListener('cancel',e=>{ if(!$('expRun').hidden) e.preventDefault(); }); $('expZip').onclick=downloadZip;
   $('expCancel').onclick=$('expClose').onclick=()=>{ $('expVideo').pause(); $('exportDlg').close(); }; $('expGo').onclick=runExport;
   window.addEventListener('keydown',e=>{
