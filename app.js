@@ -134,7 +134,7 @@ function render(){
       ctx.beginPath(); ctx.arc(a[0],a[1],7*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.stroke(); }
     if(linkPick){ ctx.font=`${Math.round(24*px)}px sans-serif`; for(const o of linkCands()){ const e=mats.get(o.id); if(!e) continue; const [x,y]=centreOf(e); ctx.beginPath(); ctx.arc(x,y,28*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } } }
   if((mode==='setup'||mode==='rec'||mode==='count')&&!linkPick){ ctx.font=`${Math.round(22*px)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; const held=new Set([...grabs.values()].filter(g=>g.group).map(g=>g.id));
-    for(const s of scene.items){ if(!scene.items.some(o=>o.link===s.id)) continue; const e=mats.get(s.id); if(!e) continue; const [x,y]=centreOf(e),on=held.has(s.id); ctx.beginPath(); ctx.arc(x,y,(on?26:22)*px,0,7); ctx.fillStyle=on?'#fff3c4':'#ffe08aee'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } }
+    for(const s of scene.items){ if(!scene.items.some(o=>o.link===s.id)||(mode!=='setup'&&s.fixed)) continue; const e=mats.get(s.id); if(!e) continue; const [x,y]=centreOf(e),on=held.has(s.id); ctx.beginPath(); ctx.arc(x,y,(on?26:22)*px,0,7); ctx.fillStyle=on?'#fff3c4':'#ffe08aee'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } }
   const it=sel();
   if(it&&mode!=='play'){ const c=cornersOf(mats.get(it.id)); if(c){ ctx.setLineDash([8*px,6*px]); ctx.lineWidth=2*px; ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(...c.tl); ctx.lineTo(...c.tr); ctx.lineTo(...c.br); ctx.lineTo(...c.bl); ctx.closePath(); ctx.stroke(); ctx.strokeStyle='#000'; ctx.lineDashOffset=8*px; ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset=0;
       if(!linkPick){ ctx.beginPath(); ctx.arc(c.tr[0],c.tr[1],13*px,0,7); ctx.fillStyle='#0b6e6e'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.strokeStyle='#fff'; ctx.stroke(); } } }
@@ -155,7 +155,7 @@ function hitAny(x,y,scenery,mats){
   const items=cur().items; for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(!pixelHit(mats.get(it.id),x,y)) continue;
     if(scenery){ if(it.fixed) return it; continue; }
     if(!it.fixed) return it;
-    if(mode==='rec'){ const m=movableMaster(it); if(m){ hitGroup=true; return m; } } } // a pinned cutout stuck to another hands the tap to its master
+    } // pinned cutouts can't be grabbed while recording: the tap goes through to what's behind
   return null;
 }
 function target(it){ if(mode==='rec'){ touchRec(it); return live.get(it.id); } return it; }
@@ -171,7 +171,7 @@ function keepKids(it,change){ const sc=cur(),kids=sc.items.filter(o=>o.link===it
   const e=sceneMats(sc,poseNow,0,false).get(it.id); if(!e) return; const Pi=minv(e.m);
   kids.forEach((k,i)=>{ if([...grabs.values()].some(g=>g.id===k.id)) return; const q=target(k),d=mdecomp(mmul(Pi,Wk[i])); q.x=d.x; q.y=d.y; q.s=d.s; q.r=d.r-(q.tilt||0); q.flip=d.flip; }); }
 const hasKids=it=>cur().items.some(o=>o.link===it.id);
-function chainAt(x,y,touch){ if(mode!=='setup'&&mode!=='rec') return null; const mats=matsNow(),items=cur().items,R=(touch?34:26)/vs*dpr; for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(!hasKids(it)) continue; const e=mats.get(it.id); if(!e) continue; const [cx,cy]=centreOf(e); if(Math.hypot(x-cx,y-cy)<R) return it; } return null; }
+function chainAt(x,y,touch){ if(mode!=='setup'&&mode!=='rec') return null; const mats=matsNow(),items=cur().items,R=(touch?34:26)/vs*dpr; for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(!hasKids(it)||(mode==='rec'&&it.fixed)) continue; const e=mats.get(it.id); if(!e) continue; const [cx,cy]=centreOf(e); if(Math.hypot(x-cx,y-cy)<R) return it; } return null; }
 const groupGrab=id=>[...grabs.values()].some(g=>g.id===id&&g.group);
 function clampFor(it,p){ if(it.link) p.s=clamp(p.s,.005,60); else clampPose(p); }
 function clampPose(p){ p.x=clamp(p.x,-MX+20,W+MX-20); p.y=clamp(p.y,-MY+20,H+MY-20); p.s=clamp(p.s,.03,8); }
@@ -290,7 +290,8 @@ function sample(t,dt){
       else { st.clock+=dt; const q=loopPose(it,st.clock); p.x=q.x; p.y=q.y; p.s=q.s; p.r=q.r; }
     }
     const l=rec.last[id];
-    { const vx=(p.x-l.x)/Math.max(dt,.001), held=[...grabs.values()].some(g=>g.id===id)||loopOn(it), goal=held?clamp(vx*.00028,-.2,.2):0; p.tilt+=(goal-p.tilt)*Math.min(1,dt*11); if(Math.abs(p.tilt)<.001) p.tilt=0; }
+    { const vx=(p.x-l.x)/Math.max(dt,.001), held=[...grabs.values()].some(g=>g.id===id)||loopOn(it), goal=held?clamp(vx*.00028,-.2,.2):0,lean=()=>{ p.tilt+=(goal-p.tilt)*Math.min(1,dt*11); if(Math.abs(p.tilt)<.001) p.tilt=0; };
+      if(p.tilt!==goal&&!groupGrab(id)) keepKids(it,lean); else lean(); } // the lean when dragged mustn't swing the cutouts stuck to it
     const changed=Math.abs(p.x-l.x)>.05||Math.abs(p.y-l.y)>.05||Math.abs(p.s-l.s)>.0005||Math.abs(p.r-l.r)>.0005||p.flip!==l.flip||Math.abs(p.tilt-l.tilt)>.001;
     if(!changed) continue;
     const tr=rec.tracks[id]||(rec.tracks[id]=[]), lp=rec.lastPush[id]||-1;
