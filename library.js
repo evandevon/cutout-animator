@@ -52,13 +52,13 @@ const Library=(()=>{
     ['pirate','Pirate',{hair:'short',hairCol:'#2a1a12',patch:true,beard:'#2a1a12',top:'#fff',chest:stripes(120,5,20,'#c8321e'),sleeve:'#c8321e',legs:'#2f3a55',hat:p('M38 26 Q100 -30 162 26 Q100 8 38 26 Z','#22202a')+c(100,10,6,'#fff')}],
     ['knight','Knight',{skin:SK[1],hair:'bald',top:'#aab4c0',legs:'#7f8a96',sleeve:'#8d98a5',hand:'#7f8a96',shoes:'#5c6570',chest:p('M100 124 L100 200 M72 150 L128 150'),hat:p('M50 52 Q50 4 100 4 Q150 4 150 52 L150 40 L50 40 Z','#aab4c0')+p('M100 4 Q118 -22 134 -8 Q116 -6 108 8','#c8321e')}],
     ['princess','Royal',{skin:SK[3],hair:'long',hairCol:'#1f1512',top:'#e36fa5',dress:true,shoes:'#b0417a',hat:p('M68 18 L68 -14 L84 4 L100 -18 L116 4 L132 -14 L132 18 Z','#f4c430')}],
-    ['wizard','Wizard',{skin:SK[0],hair:'bald',beard:'#f2f2f2',top:'#3f4aa0',dress:true,shoes:'#2a2f66',hat:p('M44 22 L100 -66 L156 22 Q100 2 44 22 Z','#3f4aa0')+dot(96,-14,5)+dot(112,4,4)}],
+    ['wizard','Wizard',{skin:SK[0],hair:'bald',beard:'#f2f2f2',top:'#3f4aa0',dress:true,shoes:'#2a2f66',hat:p('M36 40 L100 -50 L164 40 Q100 20 36 40 Z','#3f4aa0')+dot(96,0,5)+dot(114,18,4)}],
     ['chef','Chef',{skin:SK[2],hair:'short',hairCol:'#1f1512',top:'#fafafa',legs:'#55606e',chest:dot(100,136,4)+dot(100,160,4)+dot(100,184,4),hat:p('M60 18 L60 -16 Q44 -44 72 -44 Q84 -66 106 -50 Q140 -60 140 -28 L140 18 Q100 6 60 18 Z','#fff')}],
     ['astronaut','Astronaut',{skin:SK[1],hair:'bald',top:'#f0f0f0',legs:'#dcdcdc',sleeve:'#e4e4e4',hand:'#b9c2cc',shoes:'#8a93a0',chest:r(78,132,44,30,'#3b82c4',4),back:r(30,110,140,90,'#b9c2cc',12),hat:`<circle cx="100" cy="62" r="60" fill="#cfe9f5" fill-opacity=".35"/>`}],
   ];
-  function wheelchair(){ const hy=62,skin=SK[1]; let s=c(116,300,62,'#eef2f6')+c(116,300,18,'#8a93a0')+p('M116 238 L116 362 M54 300 L178 300')+c(30,344,18,'#8a93a0');
+  function wheelchair(){ const hy=100,skin=SK[1]; /* eye line low enough that the neck meets the body */ let s=c(116,300,62,'#eef2f6')+c(116,300,18,'#8a93a0')+p('M116 238 L116 362 M54 300 L178 300')+c(30,344,18,'#8a93a0');
     s+=p('M150 130 L150 240 L60 240 L34 340','none')+r(58,150,84,92,'#3fa0d6',14)+r(44,230,64,28,'#34495e',8)+r(26,240,28,86,'#34495e',8)+r(10,318,44,18,K,8)+r(44,160,22,60,'#3fa0d6',10)+c(55,226,12,skin);
-    s+=r(88,hy+34,24,24,skin)+c(100,hy,50,skin)+face(hy)+hairFront('short','#b5651d',hy); return svg(190,366,s); }
+    s+=r(88,hy+34,24,24,skin)+c(100,hy,50,skin)+face(hy)+hairFront('short','#b5651d',hy); return svg(190,330,`<g transform="translate(0,-36)">${s}</g>`); }
 
   /* ---- animals ---- */
   function quad(o){ const b=o.body,d=o.dark||b,W=340,H=o.h||230; let s='';
@@ -152,6 +152,7 @@ const Library=(()=>{
   add('People',true,P.map(([id,n,o])=>[id,n,person(o)])); items.push({id:'wheelchair',name:'Kid in a wheelchair',cat:'People',alive:true,svg:wheelchair()});
   add('Animals',true,A); add('Nature',false,N); add('Buildings',false,B); add('Vehicles',false,V); add('Things',false,T);
   items.find(i=>i.id==='robot').alive=true;
+  for(const i of items) if(i.cat==='Buildings'||(i.cat==='Nature'&&!['cloud','sun','moon','star'].includes(i.id))) i.scenery=true; // starts as scenery; can be changed
   const CATS=['People','Animals','Nature','Buildings','Vehicles','Things'];
 
   /* Rasterise with a paper-white edge, so premade pieces look cut out like students' drawings. */

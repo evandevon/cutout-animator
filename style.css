@@ -50,7 +50,7 @@ select,#askInput,#projName,#sfxName{font:inherit;min-height:var(--tap);padding:.
 #itemBar{position:absolute;top:.35rem;left:50%;transform:translateX(-50%);display:flex;gap:.3rem;z-index:2;max-width:100%;flex-wrap:wrap;justify-content:center;width:max-content}
 #itemBar button{min-height:2.4rem;padding:.2rem .55rem;font-size:.9rem;box-shadow:1px 1px 0 var(--line)}
 .animSet{display:inline-flex;gap:.2rem;padding-right:.35rem;margin-right:.1rem;border-right:2px solid #fff6}
-[data-anim].on,#itLoop.on{background:#ffe08a;outline:3px solid #ffe08a}
+[data-anim].on,#itLoop.on,#itFixed.on{background:#ffe08a;outline:3px solid #ffe08a}
 [data-anim]{font-size:1.15rem!important}
 #teachHint{position:absolute;bottom:.5rem;left:50%;transform:translateX(-50%);color:#fff;background:#0b6e6e;padding:.5rem .9rem;border-radius:.5rem;pointer-events:none;font-weight:700;text-align:center;max-width:90%;z-index:2}
 #padRow{display:flex;gap:.5rem;flex-wrap:wrap;flex:none;max-height:calc(2*(var(--tap) + 1.5rem));overflow-y:auto;padding:2px}
