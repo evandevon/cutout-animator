@@ -76,6 +76,7 @@ select,#askInput,#projName,#sfxName{font:inherit;min-height:var(--tap);padding:.
 #micSel{max-width:13rem;font-size:.87rem}
 #micMsg{font-size:.87rem;color:var(--muted)}
 .meter{display:block;width:clamp(4.5rem,9vw,11rem);height:.9rem;flex:none;border:2px solid var(--line);border-radius:.45rem;overflow:hidden;background:#fff}
+.meter.paused{opacity:.4;border-style:dashed}
 .micBar{display:block;height:100%;width:0;background:#2a9d4a}.micBar.hot{background:var(--rec)}
 #timer{font:800 1.9rem ui-monospace,Menlo,Consolas,monospace;color:var(--rec);min-width:4rem}
 #scenes{display:flex;gap:.6rem;padding:.5rem .75rem;padding-bottom:max(.5rem,env(safe-area-inset-bottom));align-items:center;min-width:0}

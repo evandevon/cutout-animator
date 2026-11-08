@@ -261,6 +261,7 @@ async function startRecording(layer){
   if(scene.take&&!layer){ const v=await ask('Replace this recording?','Scene '+(project.scenes.indexOf(scene)+1)+' already has a recording. You can Undo afterwards.',[['Keep it',null],['Replace','y','danger']]); if(!v) return; }
   Sound.audioCtx(); selId=layer?selId:null; updateItemBar();
   voiceWanted=$('voiceOn').checked; micOK=false;
+  micHold=0; micPaused=false; clearTimeout(micBackT);
   if(voiceWanted){ await micOn(); micOK=!!Sound.mic.stream; if(!micOK) toast("The microphone isn't available, so this recording has no voice."); }
   mode='count'; setLive(true); $('countdown').hidden=false;
   const buf=await preload(scene); for(const r of scenePads(scene)) Sound.buffer(r,project.assets).catch(()=>{});
@@ -324,7 +325,7 @@ function setLive(on){ document.body.classList.toggle('live',on); showScript(); r
 /* ---------- live microphone meter and picker ---------- */
 function micPref(v){ try{ if(v===undefined) return localStorage.getItem('ca-mic')||''; localStorage.setItem('ca-mic',v); }catch(_){ return ''; } }
 function paintMeter(){ const l=Sound.mic.stream?Sound.mic.level:0, pct=l>.002?clamp((20*Math.log10(l)+50)/50,0,1)*100:0; document.querySelectorAll('.micBar').forEach(b=>{ b.style.width=pct+'%'; b.classList.toggle('hot',l>.92); }); }
-function micUI(msg){ const on=!!Sound.mic.stream,want=$('voiceOn').checked; $('micMeter').hidden=!on; $('micEnable').hidden=on||!want||!!msg||!keepMic(); $('micMsg').hidden=!msg; $('micMsg').textContent=msg||''; if(!on) $('micSel').hidden=true; }
+function micUI(msg){ const on=!!Sound.mic.stream||micPaused,want=$('voiceOn').checked; $('micMeter').hidden=!on; $('micEnable').hidden=on||!want||!!msg||!keepMic(); $('micMeter').classList.toggle('paused',micPaused); $('micMeter').title=micPaused?'Microphone paused while a sound plays':''; $('micMsg').hidden=!msg; $('micMsg').textContent=msg||''; if(!on) $('micSel').hidden=true; }
 async function micList(){ if(!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices) return; const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput'&&d.deviceId!=='default'&&d.deviceId!=='communications'), active=Sound.mic.stream&&Sound.mic.stream.getAudioTracks()[0]?.getSettings().deviceId;
   for(const s of [$('micSel'),$('sfxMicSel')]){ s.innerHTML=''; ds.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||'Microphone '+(i+1); s.append(o); }); if(active&&ds.some(d=>d.deviceId===active)) s.value=active; }
   $('micSel').hidden=!Sound.mic.stream||ds.length<2; $('sfxMicWrap').hidden=!Sound.mic.stream||!ds.length; }
@@ -332,6 +333,12 @@ async function micOn(){ if(!$('voiceOn').checked) return; try{ await Sound.micSt
 /* Holding the microphone open makes Windows treat the browser as a phone call, and many laptops then mute
    or turn down every other sound. The always-on level meter can be switched off in the menu. */
 const keepMic=()=>{ try{ return localStorage.getItem('ca-micidle')!=='0'; }catch(_){ return true; } };
+/* While setting up, the level meter steps aside whenever a sound is played (previews, test sound, effect
+   buttons), so Windows doesn't mute it, then comes back once the sound has finished. */
+let micHold=0,micBackT=0,micPaused=false;
+function quiet(){ if(mode==='rec'||mode==='count'){ return ()=>{}; } micHold++; clearTimeout(micBackT); if(Sound.mic.stream&&keepMic()&&!$('sfxDlg').open){ Sound.micStop(); micPaused=true; micUI(); } let done=false;
+  return ()=>{ if(done) return; done=true; micHold=Math.max(0,micHold-1); if(!micHold&&micPaused){ clearTimeout(micBackT); micBackT=setTimeout(()=>{ if(micHold||mode!=='setup') return; micPaused=false; micOn(); },500); } }; }
+const quietFor=sec=>{ const r=quiet(); setTimeout(r,sec*1000+150); };
 async function micInit(){ if(!keepMic()){ micUI(); return; } let st='prompt'; try{ st=(await navigator.permissions.query({name:'microphone'})).state; }catch(_){} if(st==='granted') micOn(); else micUI(st==='denied'?'Microphone is blocked in the browser settings':''); }
 
 /* ---------- playback ---------- */
@@ -388,16 +395,16 @@ function renderPadList(){ const box=$('padList'); if(!box) return; box.innerHTML
     row.append(l,pl,ed,d); box.append(row); }); }
 function dropSound(r){ project.pads=project.pads.filter(x=>x!==r); for(const s of project.scenes) if(s.pads) s.pads=s.pads.filter(x=>x!==r); }
 function addSound(r){ if(!project.pads.includes(r)) project.pads.push(r); const s=cur(); s.pads=s.pads||[]; if(!s.pads.includes(r)) s.pads.push(r); }
-async function hitPad(r){ const c=Sound.audioCtx(),at=mode==='rec'&&rec?recTime():null; try{ const b=await Sound.buffer(r,project.assets); if(!b) return; const s=c.createBufferSource(),g=c.createGain(); s.buffer=b; g.gain.value=project.mix.fx; s.connect(g); g.connect(Sound.master(c)); s.start(); if(at!==null&&mode==='rec'&&rec) rec.fx.push({t:r3(at),ref:r}); }catch(e){ toast("That sound couldn't be played."); } }
+async function hitPad(r){ const c=Sound.audioCtx(),at=mode==='rec'&&rec?recTime():null; try{ const b=await Sound.buffer(r,project.assets); if(!b) return; const s=c.createBufferSource(),g=c.createGain(); s.buffer=b; g.gain.value=project.mix.fx; s.connect(g); g.connect(Sound.master(c)); s.start(); if(at===null) quietFor(b.duration); if(at!==null&&mode==='rec'&&rec) rec.fx.push({t:r3(at),ref:r}); }catch(e){ toast("That sound couldn't be played."); } }
 async function libRef(path,nm){ let r=refForLib(path); if(r) return r; const q=await fetch('sounds/'+path.split('/').map(encodeURIComponent).join('/')); if(!q.ok) throw 0; const blob=await q.blob(),a=addAsset('audio',blob,nm||path.split('/').pop().replace(/\.[^.]+$/,'')); a.libPath=path; return 'asset:'+a.id; }
 async function renderLibrary(){ const box=$('sfxLib'); if(box.dataset.done) return; box.dataset.done=1;
   try{ const m=await (await fetch('sounds/manifest.json')).json(); for(const cat in m){ const d=document.createElement('details'),s=document.createElement('summary'); s.textContent=cat==='Other'?'More':cat; d.append(s); const w=document.createElement('div'); w.className='libItems'; for(const path of m[cat]){ const nm=path.split('/').pop().replace(/\.[^.]+$/,''),l=document.createElement('label'); l.className='check'; const c=document.createElement('input'); c.type='checkbox'; c.value=path; l.append(c,' '+nm); c.onchange=async()=>{ try{ checkpoint(); if(c.checked){ const r=await libRef(path,nm); addSound(r); hitPad(r); } else dropSound(refForLib(path)); renderPads(); dirty(); }catch(_){ toast("That sound couldn't be loaded."); c.checked=false; } };
       const pv=document.createElement('button'); pv.className='small libPrev'; pv.textContent='▶'; pv.setAttribute('aria-label','Listen to '+nm); pv.onclick=()=>previewLib(path,pv); const row=document.createElement('div'); row.className='libRow'; row.append(pv,l); w.append(row); } d.append(w); box.append(d); } renderPads(); }
   catch(_){ box.innerHTML='<p class="hint">The sound list needs a connection.</p>'; } }
 let libPv=null;
-function stopLibPreview(){ if(!libPv) return; try{ libPv.src.stop(); }catch(_){} libPv.btn.textContent='▶'; libPv.btn.setAttribute('aria-label',libPv.btn.getAttribute('aria-label').replace('Stop','Listen to')); libPv=null; }
+function stopLibPreview(){ if(!libPv) return; libPv.rel&&libPv.rel(); try{ libPv.src.stop(); }catch(_){} libPv.btn.textContent='▶'; libPv.btn.setAttribute('aria-label',libPv.btn.getAttribute('aria-label').replace('Stop','Listen to')); libPv=null; }
 async function previewLib(path,btn){ const same=libPv&&libPv.btn===btn; stopLibPreview(); if(same) return; const c=Sound.audioCtx(),me={btn,src:null}; libPv=me; btn.textContent='■'; btn.setAttribute('aria-label',btn.getAttribute('aria-label').replace('Listen to','Stop'));
-  try{ const q=await fetch('sounds/'+path.split('/').map(encodeURIComponent).join('/')); if(!q.ok) throw 0; const buf=await decodeBlob(await q.blob()); if(libPv!==me) return; const s=c.createBufferSource(); s.buffer=buf; s.connect(Sound.master(c)); s.onended=()=>{ if(libPv===me) stopLibPreview(); }; me.src=s; s.start(); }catch(_){ if(libPv===me) stopLibPreview(); toast("That sound couldn't be played."); } }
+  try{ const q=await fetch('sounds/'+path.split('/').map(encodeURIComponent).join('/')); if(!q.ok) throw 0; const buf=await decodeBlob(await q.blob()); if(libPv!==me) return; const s=c.createBufferSource(); s.buffer=buf; s.connect(Sound.master(c)); s.onended=()=>{ if(libPv===me) stopLibPreview(); }; me.src=s; me.rel=quiet(); s.start(); }catch(_){ if(libPv===me) stopLibPreview(); toast("That sound couldn't be played."); } }
 function drawThumb(c,s){ const g=c.getContext('2d'); g.setTransform(c.width/W,0,0,c.height/H,0,0); drawScene(g,s,it=>it); }
 function renderScenes(){ if(sd) return; /* don't rebuild the strip under a finger that's dragging it */ const box=$('sceneList'),keep=box.scrollLeft; box.innerHTML=''; project.scenes.forEach((s,i)=>{ const on=s.id===(playing?playing.scene.id:curId),b=document.createElement('button'); b.className='scene'+(on?' on':''); b.dataset.id=s.id; b.title='Hold and drag to move'; b.setAttribute('aria-label','Scene '+(i+1)+(s.take?', recorded':'')+'. Shift and arrow keys move it.');
     const c=document.createElement('canvas'); c.width=186;c.height=105; drawThumb(c,s); b.append(c); const n=document.createElement('span'); n.className='num'; n.textContent=i+1; b.append(n);
@@ -531,7 +538,7 @@ async function sfxOpen(){ if(mode!=='setup') return; sfxX={mode:'new',ref:null,b
   try{ await Sound.micStart(micPref()); micUI(); await micList(); }catch(e){ $('sfxMicWrap').hidden=true; $('sfxMsg').textContent=e.name==='NotAllowedError'?'The microphone is blocked in the browser settings.':"Can't find a microphone."; } }
 async function sfxEdit(ref){ if(mode!=='setup') return; const a=project.assets[ref.slice(6)]; if(!a) return; let buf; try{ buf=await decodeBlob(a.blob); }catch(_){ toast("That sound couldn't be opened."); return; }
   sfxX={mode:'edit',ref,buf,a:0,b:buf.duration,blob:a.blob}; $('sfxTitle').textContent='Change this sound'; $('sfxKeep').textContent='✓ Save'; $('sfxName').value=a.name; $('sfxMsg').textContent=''; sfxSync(); $('sfxDlg').showModal(); sfxState('done'); }
-function sfxStart(){ if(!Sound.mic.stream) return; Sound.audioCtx(); Sound.micCollect(); sfxT0=performance.now(); sfxState('rec'); sfxTimer=setInterval(()=>{ const s=(performance.now()-sfxT0)/1000; $('sfxTime').textContent=s.toFixed(1)+' s'; if(s>=10) sfxStop(); },100); }
+async function sfxStart(){ if(!Sound.mic.stream){ try{ await Sound.micStart(micPref()); }catch(_){ return; } } Sound.audioCtx(); Sound.micCollect(); sfxT0=performance.now(); sfxState('rec'); sfxTimer=setInterval(()=>{ const s=(performance.now()-sfxT0)/1000; $('sfxTime').textContent=s.toFixed(1)+' s'; if(s>=10) sfxStop(); },100); }
 async function sfxStop(){ clearInterval(sfxTimer); const b=Sound.micTakeTrimmed(); if(!b){ sfxState('idle'); $('sfxMsg').textContent="That was too quiet. Get closer to the microphone and try again."; return; }
   sfxX.blob=b; sfxX.buf=await decodeBlob(b); sfxX.a=0; sfxX.b=sfxX.buf.duration; $('sfxMsg').textContent=''; sfxSync(); sfxState('done'); sfxPlay(); }
 function sfxSync(){ const d=sfxDur()||1; $('sfxA').value=Math.round(sfxX.a/d*1000); $('sfxB').value=Math.round(sfxX.b/d*1000); $('sfxLen').textContent=(sfxX.b-sfxX.a).toFixed(1)+' s'; sfxDraw(); }
@@ -584,7 +591,7 @@ function wire(){
   const fillOut=async()=>{ if(!Sound.canPickOutput||!navigator.mediaDevices?.enumerateDevices) return; const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audiooutput'&&d.deviceId!=='communications'),s=$('outSel'); s.innerHTML=''; ds.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId==='default'?'':d.deviceId; o.textContent=d.deviceId==='default'?'Computer default':(d.label||'Speaker '+(i+1)); s.append(o); }); s.value=pref('ca-out')||''; if(s.selectedIndex<0) s.value=''; $('outWrap').hidden=ds.length<2; };
   if(pref('ca-out')) Sound.setSink(pref('ca-out'));
   $('outSel').onchange=e=>{ pref('ca-out',e.target.value); Sound.setSink(e.target.value); Sound.testTone(); };
-  $('testSound').onclick=()=>Sound.testTone();
+  $('testSound').onclick=()=>{ quietFor(1.2); setTimeout(()=>Sound.testTone(),60); };
   $('micIdle').checked=keepMic(); $('micIdle').onchange=e=>{ pref('ca-micidle',e.target.checked?'1':'0'); if(e.target.checked) micOn(); else { Sound.micStop(); micUI(); } };
   $('menuBtn').addEventListener('click',fillOut);
   const setLib=v=>{ $('sfxLibWrap').hidden=!v; $('libToggle').checked=v; try{ localStorage.setItem('ca-sfxlib',v?'1':''); }catch(_){} if(!v) stopLibPreview(); };
@@ -595,8 +602,8 @@ function wire(){
   $('addDrawing').onclick=()=>Cut.open('cutout'); $('addBackdrop').onclick=()=>Cut.open('backdrop'); $('addWords').onclick=addWords;
   $('backColor').oninput=e=>{ cur().backdrop={type:'color',color:e.target.value}; renderBack(); dirty(); }; $('backColor').onchange=()=>{};
   $('ambSel').onchange=e=>{ checkpoint(); stopPrev(); cur().ambience=e.target.value||null; dirty(); }; $('musSel').onchange=e=>{ checkpoint(); stopPrev(); cur().music=e.target.value||null; dirty(); };
-  let prevStop=null,prevBtn=null; const stopPrev=()=>{ if(prevStop){ prevStop(); prevStop=null; prevBtn.textContent='▶'; } };
-  const prev=(btn,get,key)=>btn.onclick=async()=>{ if(prevBtn===btn&&prevStop){ stopPrev(); return; } stopPrev(); const r=get(); if(!r) return; const c=Sound.audioCtx(),b=await Sound.buffer(r,project.assets),fake={ambience:key==='ambience'?r:null,music:key==='music'?r:null}; prevStop=Sound.schedule(c,Sound.master(c),fake,c.currentTime+.02,x=>x===r?b:null,project.mix,{dur:Infinity}); prevBtn=btn; btn.textContent='■'; };
+  let prevStop=null,prevBtn=null; let prevRel=null; const stopPrev=()=>{ if(prevStop){ prevStop(); prevStop=null; prevBtn.textContent='▶'; } if(prevRel){ prevRel(); prevRel=null; } };
+  const prev=(btn,get,key)=>btn.onclick=async()=>{ if(prevBtn===btn&&prevStop){ stopPrev(); return; } stopPrev(); const r=get(); if(!r) return; const c=Sound.audioCtx(),b=await Sound.buffer(r,project.assets),fake={ambience:key==='ambience'?r:null,music:key==='music'?r:null}; prevRel=quiet(); prevStop=Sound.schedule(c,Sound.master(c),fake,c.currentTime+.02,x=>x===r?b:null,project.mix,{dur:Infinity}); prevBtn=btn; btn.textContent='■'; };
   prev($('ambPrev'),()=>$('ambSel').value,'ambience'); prev($('musPrev'),()=>$('musSel').value,'music');
   $('recSfx').onclick=sfxOpen; $('sfxRecGo').onclick=()=>$('sfxRecGo').classList.contains('going')?sfxStop():sfxStart(); $('sfxAgain').onclick=()=>{ sfxX.buf=null; sfxState('idle'); }; sfxWire(); $('sfxPlay').onclick=sfxPlay; $('sfxKeep').onclick=sfxKeep; $('sfxCancel').onclick=sfxClose; $('sfxDlg').addEventListener('cancel',e=>{ e.preventDefault(); sfxClose(); });
   $('uploadSound').onclick=()=>$('soundInput').click();
