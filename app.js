@@ -22,7 +22,7 @@ const PRESETS={
 
 let project,undoStack=[],redoStack=[],curId,selId=null,mode='setup',tab='cast';
 const imgs=new Map(),hitMaps=new Map();
-const blankScene=n=>({id:uid(),name:'Scene '+n,backdrop:{type:'preset',id:'sky'},ambience:null,music:null,items:[],take:null});
+const blankScene=n=>({id:uid(),pads:[],name:'Scene '+n,backdrop:{type:'preset',id:'sky'},ambience:null,music:null,items:[],take:null});
 const newProject=()=>({version:1,name:'My animation',assets:{},cast:[],backdrops:[],pads:[],scenes:[blankScene(1)],mix:{voice:1,ambience:.5,music:.4,fx:1},wobble:true});
 const cur=()=>project.scenes.find(s=>s.id===curId)||project.scenes[0];
 const sel=()=>cur().items.find(i=>i.id===selId)||null;
@@ -182,7 +182,7 @@ async function startRecording(layer){
   voiceWanted=$('voiceOn').checked; micOK=false;
   if(voiceWanted){ await micOn(); micOK=!!Sound.mic.stream; if(!micOK) toast("The microphone isn't available, so this recording has no voice."); }
   mode='count'; setLive(true); $('countdown').hidden=false;
-  const buf=await preload(scene); for(const r of project.pads) Sound.buffer(r,project.assets).catch(()=>{});
+  const buf=await preload(scene); for(const r of scenePads(scene)) Sound.buffer(r,project.assets).catch(()=>{});
   for(const n of [3,2,1]){ $('countdown').textContent=n; await new Promise(r=>setTimeout(r,700)); }
   $('countdown').hidden=true; beginTake(scene,layer,buf);
 }
@@ -235,7 +235,7 @@ function finishTake(){
   grabs.clear(); rec=null; live.clear();
 }
 function stopRecording(){ if(mode==='count') return; if(mode!=='rec') return; finishTake(); micOK=false; mode='setup'; setLive(false); refreshAll(); dirty(); toast('Recorded! Press Play to watch it.'); }
-async function nextScene(){ if(mode!=='rec'||!nextOpen()) return; const i=project.scenes.indexOf(cur()); finishTake(); const n=project.scenes[i+1]; curId=n.id; selId=null; mode='count'; const buf=await preload(n); renderScenes(); showScript(); beginTake(n,false,buf); }
+async function nextScene(){ if(mode!=='rec'||!nextOpen()) return; const i=project.scenes.indexOf(cur()); finishTake(); const n=project.scenes[i+1]; curId=n.id; selId=null; mode='count'; const buf=await preload(n); renderScenes(); showScript(); renderPads(); beginTake(n,false,buf); }
 function showScript(){ const s=cur(),a=(mode==='rec'||mode==='count')&&s.script&&project.assets[s.script],v=$('scriptView'); v.hidden=!a; if(a){ if(!a.__u) a.__u=URL.createObjectURL(a.blob); $('scriptImg').src=a.__u; } }
 function setLive(on){ document.body.classList.toggle('live',on); showScript(); renderPads(); $('transport').hidden=on; $('recBar').hidden=!on; $('stopBtn').querySelector('.sq').hidden=false; $('stopBtn').lastChild.textContent=' Stop'; $('timer').hidden=false; $('micLevelWrap').hidden=!micOK; $('nextSceneBtn').hidden=true; $('timer').textContent='0:00'; resize(); }
 
@@ -286,17 +286,26 @@ function renderBack(){ const box=$('backList'),sc=cur(); box.innerHTML='';
 function fillSelect(sel,builtin,prefix,val){ sel.innerHTML=''; const o=(v,t)=>{ const e=document.createElement('option'); e.value=v; e.textContent=t; sel.append(e); }; o('','None'); for(const k in builtin) o(prefix+':'+k,builtin[k]); for(const id in project.assets){ const a=project.assets[id]; if(a.kind==='audio'&&a.userSound) o('asset:'+id,a.name); } sel.value=val||''; }
 function renderSoundTab(){ const s=cur(); fillSelect($('ambSel'),Sound.AMBIENCE,'syn',s.ambience); fillSelect($('musSel'),Sound.MUSIC,'mus',s.music);
   const m=project.mix; $('mixVoice').value=m.voice; $('mixAmb').value=m.ambience; $('mixMus').value=m.music; $('mixFx').value=m.fx; renderPads(); }
+const scenePads=(s=cur())=>(s.pads||[]).filter(r=>project.pads.includes(r));
 function padName(r){ const a=project.assets[r.slice(6)]; return a?a.name:'?'; }
-function renderPads(){ const box=$('padRow'); box.innerHTML=''; renderPadList(); (project.pads||[]).forEach((r,i)=>{ const b=document.createElement('button'); b.className='pad'; b.innerHTML=(i<9?`<kbd>${i+1}</kbd> `:'')+(isMine(r)?'🎤 ':'🔊 '); b.append(padName(r)); b.onpointerdown=e=>{ e.preventDefault(); hitPad(r); }; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); hitPad(r); } };
-    if(mode==='setup'){ const x=document.createElement('span'); x.className='trash'; x.textContent='🗑'; x.setAttribute('role','button'); x.setAttribute('aria-label','Remove the '+padName(r)+' button'); x.onpointerdown=e=>{ e.stopPropagation(); e.preventDefault(); }; x.onclick=e=>{ e.stopPropagation(); checkpoint(); project.pads=project.pads.filter(q=>q!==r); renderPads(); dirty(); toast('Removed. Undo brings it back.',1500); }; b.append(x); }
-    box.append(b); }); box.hidden=!project.pads.length||mode==='play'; document.querySelectorAll('#sfxLib input').forEach(c=>{ c.checked=project.pads.includes(refForLib(c.value)); }); resize(); }
+function renderPads(){ const box=$('padRow'); box.innerHTML=''; renderPadList(); scenePads().forEach((r,i)=>{ const b=document.createElement('button'); b.className='pad'; b.innerHTML=(i<9?`<kbd>${i+1}</kbd> `:'')+(isMine(r)?'🎤 ':'🔊 '); b.append(padName(r)); b.onpointerdown=e=>{ e.preventDefault(); hitPad(r); }; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); hitPad(r); } };
+    if(mode==='setup'){ const x=document.createElement('span'); x.className='trash'; x.textContent='🗑'; x.setAttribute('role','button'); x.setAttribute('aria-label','Hide the '+padName(r)+' button on this scene'); x.onpointerdown=e=>{ e.stopPropagation(); e.preventDefault(); }; x.onclick=e=>{ e.stopPropagation(); checkpoint(); cur().pads=(cur().pads||[]).filter(q=>q!==r); renderPads(); dirty(); toast('Hidden on this scene. Tick it in the Sounds tab to bring it back.',2200); }; b.append(x); }
+    box.append(b); }); box.hidden=!scenePads().length||mode==='play'; document.querySelectorAll('#sfxLib input').forEach(c=>{ c.checked=project.pads.includes(refForLib(c.value)); }); resize(); }
 const refForLib=path=>{ const id=Object.keys(project.assets).find(k=>project.assets[k].libPath===path); return id?'asset:'+id:''; };
 const isMine=r=>{ const a=project.assets[r.slice(6)]; return !!(a&&a.mine); };
-function renderPadList(){ const box=$('padList'); if(!box) return; box.innerHTML=''; $('padListHead').hidden=!project.pads.length; project.pads.forEach((r,i)=>{ const row=document.createElement('div'); row.className='padItem'; const n=document.createElement('span'); n.textContent=(i<9?(i+1)+'. ':'')+(isMine(r)?'🎤 ':'')+padName(r); const pl=document.createElement('button'); pl.className='small'; pl.textContent='▶'; pl.setAttribute('aria-label','Play '+padName(r)); pl.onclick=()=>hitPad(r); const ed=document.createElement('button'); ed.className='small'; ed.textContent='✏️'; ed.setAttribute('aria-label','Rename or trim '+padName(r)); ed.onclick=()=>sfxEdit(r); const d=document.createElement('button'); d.className='small'; d.textContent='🗑'; d.setAttribute('aria-label','Remove '+padName(r)); d.onclick=()=>{ checkpoint(); project.pads=project.pads.filter(x=>x!==r); renderPads(); dirty(); }; row.append(n,pl,ed,d); box.append(row); }); }
+function renderPadList(){ const box=$('padList'); if(!box) return; box.innerHTML=''; $('padListHead').hidden=!project.pads.length; const on=cur().pads||[];
+  project.pads.forEach(r=>{ const row=document.createElement('div'); row.className='padItem'; const l=document.createElement('label'); l.className='check'; const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=on.includes(r); cb.setAttribute('aria-label','Show '+padName(r)+' as a button on this scene'); cb.onchange=()=>{ checkpoint(); const s=cur(); s.pads=(s.pads||[]).filter(x=>x!==r); if(cb.checked) s.pads.push(r); renderPads(); dirty(); };
+    const n=document.createElement('span'); n.textContent=(isMine(r)?'🎤 ':'🔊 ')+padName(r); l.append(cb,n);
+    const pl=document.createElement('button'); pl.className='small'; pl.textContent='▶'; pl.setAttribute('aria-label','Play '+padName(r)); pl.onclick=()=>hitPad(r);
+    const ed=document.createElement('button'); ed.className='small'; ed.textContent='✏️'; ed.setAttribute('aria-label','Rename or trim '+padName(r)); ed.onclick=()=>sfxEdit(r);
+    const d=document.createElement('button'); d.className='small'; d.textContent='🗑'; d.setAttribute('aria-label','Delete '+padName(r)); d.onclick=()=>{ checkpoint(); dropSound(r); renderPads(); dirty(); toast('Deleted. Undo brings it back.',1800); };
+    row.append(l,pl,ed,d); box.append(row); }); }
+function dropSound(r){ project.pads=project.pads.filter(x=>x!==r); for(const s of project.scenes) if(s.pads) s.pads=s.pads.filter(x=>x!==r); }
+function addSound(r){ if(!project.pads.includes(r)) project.pads.push(r); const s=cur(); s.pads=s.pads||[]; if(!s.pads.includes(r)) s.pads.push(r); }
 async function hitPad(r){ const c=Sound.audioCtx(),at=mode==='rec'&&rec?recTime():null; try{ const b=await Sound.buffer(r,project.assets); if(!b) return; const s=c.createBufferSource(),g=c.createGain(); s.buffer=b; g.gain.value=project.mix.fx; s.connect(g); g.connect(Sound.master(c)); s.start(); if(at!==null&&mode==='rec'&&rec) rec.fx.push({t:r3(at),ref:r}); }catch(e){ toast("That sound couldn't be played."); } }
 async function libRef(path,nm){ let r=refForLib(path); if(r) return r; const q=await fetch('sounds/'+path.split('/').map(encodeURIComponent).join('/')); if(!q.ok) throw 0; const blob=await q.blob(),a=addAsset('audio',blob,nm||path.split('/').pop().replace(/\.[^.]+$/,'')); a.libPath=path; return 'asset:'+a.id; }
 async function renderLibrary(){ const box=$('sfxLib'); if(box.dataset.done) return; box.dataset.done=1;
-  try{ const m=await (await fetch('sounds/manifest.json')).json(); for(const cat in m){ const d=document.createElement('details'),s=document.createElement('summary'); s.textContent=cat==='Other'?'More':cat; d.append(s); const w=document.createElement('div'); w.className='libItems'; for(const path of m[cat]){ const nm=path.split('/').pop().replace(/\.[^.]+$/,''),l=document.createElement('label'); l.className='check'; const c=document.createElement('input'); c.type='checkbox'; c.value=path; l.append(c,' '+nm); c.onchange=async()=>{ try{ checkpoint(); if(c.checked){ const r=await libRef(path,nm); if(!project.pads.includes(r)) project.pads.push(r); hitPad(r); } else project.pads=project.pads.filter(x=>x!==refForLib(path)); renderPads(); dirty(); }catch(_){ toast("That sound couldn't be loaded."); c.checked=false; } };
+  try{ const m=await (await fetch('sounds/manifest.json')).json(); for(const cat in m){ const d=document.createElement('details'),s=document.createElement('summary'); s.textContent=cat==='Other'?'More':cat; d.append(s); const w=document.createElement('div'); w.className='libItems'; for(const path of m[cat]){ const nm=path.split('/').pop().replace(/\.[^.]+$/,''),l=document.createElement('label'); l.className='check'; const c=document.createElement('input'); c.type='checkbox'; c.value=path; l.append(c,' '+nm); c.onchange=async()=>{ try{ checkpoint(); if(c.checked){ const r=await libRef(path,nm); addSound(r); hitPad(r); } else dropSound(refForLib(path)); renderPads(); dirty(); }catch(_){ toast("That sound couldn't be loaded."); c.checked=false; } };
       const pv=document.createElement('button'); pv.className='small libPrev'; pv.textContent='▶'; pv.setAttribute('aria-label','Listen to '+nm); pv.onclick=()=>previewLib(path,pv); const row=document.createElement('div'); row.className='libRow'; row.append(pv,l); w.append(row); } d.append(w); box.append(d); } renderPads(); }
   catch(_){ box.innerHTML='<p class="hint">The sound list needs a connection.</p>'; } }
 let libPv=null;
@@ -333,7 +342,7 @@ const sceneUp=e=>{ if(!sd||e.pointerId!==sd.id) return; clearTimeout(sd.timer); 
 window.addEventListener('pointerup',sceneUp); window.addEventListener('pointercancel',sceneUp);
 $('sceneList').addEventListener('touchmove',e=>{ if(sd&&sd.on) e.preventDefault(); },{passive:false});
 function showCurrentScene(){ const on=$('sceneList').querySelector('.scene.on'); if(on) on.scrollIntoView({block:'nearest',inline:'nearest'}); }
-function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?prev.take.dur:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:uid(),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
+function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?prev.take.dur:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; n.pads=[...(prev.pads||[])]; n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:uid(),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
 function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
 function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
 function refreshTransport(){ const s=cur(),any=project.scenes.some(x=>x.take); $('playBtn').hidden=$('layerBtn').hidden=!s.take; $('playAllBtn').hidden=project.scenes.filter(x=>x.take).length<2; $('recBtn').lastChild.textContent=s.take?' Redo':' Record'; }
@@ -354,7 +363,7 @@ async function openProject(file){ try{ const z=await JSZip.loadAsync(file),pj=z.
     for(const id in metas){ const m=metas[id],b=await z.file(m.file).async('blob'); p.assets[id]={...m,blob:new Blob([b],{type:m.type})}; }
     await adopt(p); undoStack=[]; redoStack=[]; refreshAll(); dirty(); toast('Opened '+p.name); }
   catch(e){ console.warn(e); toast("That isn't a Cutout Animator project file (.cutz)."); } }
-async function adopt(p){ imgs.clear(); hitMaps.clear(); p.mix=p.mix||{voice:1,ambience:.5,music:.4,fx:1}; project=p; curId=p.curId&&p.scenes.find(s=>s.id===p.curId)?p.curId:p.scenes[0].id; delete project.curId; delete project.savedAt; for(const s of project.scenes) for(const i of s.items) if(i.alive){ i.anim='sway'; delete i.alive; } selId=null; for(const a of Object.values(project.assets)) if(a.kind!=='audio'){ try{ await loadImg(a); }catch(_){ } } }
+async function adopt(p){ imgs.clear(); hitMaps.clear(); p.mix=p.mix||{voice:1,ambience:.5,music:.4,fx:1}; project=p; curId=p.curId&&p.scenes.find(s=>s.id===p.curId)?p.curId:p.scenes[0].id; delete project.curId; delete project.savedAt; project.pads=project.pads||[]; for(const s of project.scenes) if(!s.pads) s.pads=[...project.pads]; /* older projects showed every button on every scene */ for(const s of project.scenes) for(const i of s.items) if(i.alive){ i.anim='sway'; delete i.alive; } selId=null; for(const a of Object.values(project.assets)) if(a.kind!=='audio'){ try{ await loadImg(a); }catch(_){ } } }
 
 /* ---------- video export ---------- */
 async function mixAll(scenes,total){ const sr=48000,off=new OfflineAudioContext(2,Math.max(1,Math.ceil(total*sr)),sr); let at=0; for(const s of scenes){ const buf=await preload(s); Sound.schedule(off,Sound.master(off),s,at,buf,project.mix,{dur:s.take.dur,withTake:true}); at+=s.take.dur; } return off.startRendering(); }
@@ -452,9 +461,9 @@ function sfxPlay(){ if(!sfxX.buf) return; const c=Sound.audioCtx(); try{ sfxSrc&
 function sfxClose(){ clearInterval(sfxTimer); try{ sfxSrc&&sfxSrc.stop(); }catch(_){} sfxX.play=null; Sound.mic.chunks=null; $('sfxDlg').close(); if(!$('voiceOn').checked){ Sound.micStop(); micUI(); } }
 function sfxTrimmed(){ const buf=sfxX.buf,d=buf.duration; if(sfxX.a<.005&&sfxX.b>d-.005) return sfxX.blob; const sr=buf.sampleRate,s=Math.floor(sfxX.a*sr),e=Math.ceil(sfxX.b*sr),ch=buf.numberOfChannels,out=new Float32Array(e-s);
   for(let k=0;k<ch;k++){ const c=buf.getChannelData(k); for(let i=s;i<e;i++) out[i-s]+=c[i]/ch; } const f=Math.min(out.length>>1,Math.round(sr*.008)); for(let i=0;i<f;i++){ out[i]*=i/f; out[out.length-1-i]*=i/f; } return Sound.wav([out],out.length,sr); }
-function swapRef(from,to){ const f=r=>r===from?to:r; project.pads=project.pads.map(f); for(const s of project.scenes){ s.ambience=f(s.ambience); s.music=f(s.music); if(s.take&&s.take.fx) s.take.fx.forEach(x=>x.ref=f(x.ref)); } }
+function swapRef(from,to){ const f=r=>r===from?to:r; project.pads=project.pads.map(f); for(const s of project.scenes){ if(s.pads) s.pads=s.pads.map(f); s.ambience=f(s.ambience); s.music=f(s.music); if(s.take&&s.take.fx) s.take.fx.forEach(x=>x.ref=f(x.ref)); } }
 function sfxKeep(){ if(!sfxX.buf) return; const nm=($('sfxName').value||'My sound').trim().slice(0,30),blob=sfxTrimmed(); checkpoint();
-  if(sfxX.mode==='new'){ const a=addAsset('audio',blob,nm); a.mine=true; project.pads.push('asset:'+a.id); toast('“'+nm+'” is ready. Tap its button while recording.'); }
+  if(sfxX.mode==='new'){ const a=addAsset('audio',blob,nm); a.mine=true; addSound('asset:'+a.id); toast('“'+nm+'” is ready, and its button is on this scene.'); }
   else { const old=project.assets[sfxX.ref.slice(6)]; if(blob===sfxX.blob) old.name=nm; else { const a=addAsset('audio',blob,nm); a.mine=old.mine; a.userSound=old.userSound; swapRef(sfxX.ref,'asset:'+a.id); } toast('Saved. Scenes that use this sound use the new version.'); } // a new asset keeps Undo working
   renderPads(); renderSoundTab(); dirty(); sfxClose(); }
 function sfxWire(){ const cv=$('sfxWave'); let drag=null; const tAt=e=>{ const r=cv.getBoundingClientRect(); return clamp((e.clientX-r.left)/r.width,0,1)*sfxDur(); };
@@ -470,7 +479,6 @@ async function importSheets(sheets){ checkpoint();
     if(sh.bg){ const a=addAsset('backdrop',await jpg(sh.bg),'Sheet '+(base+added.length+1),sh.bg.width,sh.bg.height); await loadImg(a); project.backdrops.push(a.id); n.backdrop={type:'asset',id:a.id}; }
     if(sh.script){ const a=addAsset('script',await jpg(sh.script),'Script',sh.script.width,sh.script.height); n.script=a.id; }
     n.ambience=sh.amb; n.music=sh.mus;
-    for(const r of sh.fx){ try{ const ref=await libRef(r); if(!project.pads.includes(ref)) project.pads.push(ref); }catch(_){ } }
     const count=sh.chars.length; for(let i=0;i<count;i++){ const ch=sh.chars[i],a=addAsset('cutout',ch.cut.blob,'Cutout',ch.cut.w,ch.cut.h); await loadImg(a); project.cast.push(a.id); const k=Math.min(320/a.h,300/a.w,1.6); n.items.push({id:uid(),assetId:a.id,x:W*(i+1)/(count+1),y:H*.6,s:k,r:0,flip:false,anim:ch.anim||null}); }
     added.push(n); }
   project.scenes=blank?added:project.scenes.concat(added); curId=added[0].id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast(sheets.length+(sheets.length===1?' scene':' scenes')+' added.'); }
@@ -484,6 +492,8 @@ function wire(){
   Template.init({toast,onAdd:importSheets});
   Library.init({onPick:async item=>{ checkpoint(); let a=Object.values(project.assets).find(x=>x.libId===item.id&&x.kind==='cutout'); if(!a){ const c=await Library.toCutout(item); a=addAsset('cutout',c.blob,item.name,c.w,c.h); a.libId=item.id; await loadImg(a); } if(!project.cast.includes(a.id)) project.cast.push(a.id); const it=placeCutout(a); it.anim=item.alive?'sway':null; renderCast(); updateItemBar(); dirty(); toast(item.name+' added to the stage.',1500); }});
   $('addLibrary').onclick=()=>Library.open(); $('startLib').onclick=()=>Library.open(); $('startDraw').onclick=()=>Cut.open('cutout');
+  const setLib=v=>{ $('sfxLibWrap').hidden=!v; $('libToggle').checked=v; try{ localStorage.setItem('ca-sfxlib',v?'1':''); }catch(_){} if(!v) stopLibPreview(); };
+  try{ setLib(localStorage.getItem('ca-sfxlib')==='1'); }catch(_){ setLib(false); } $('libToggle').onchange=e=>setLib(e.target.checked);
   const setBig=v=>{ document.documentElement.classList.toggle('bigUI',v); $('bigUI').checked=v; try{ localStorage.setItem('ca-big',v?'1':''); }catch(_){} resize(); };
   try{ setBig(localStorage.getItem('ca-big')==='1'); }catch(_){} $('bigUI').onchange=e=>setBig(e.target.checked);
   const fs=document.documentElement; if(!fs.requestFullscreen) $('fsBtn').hidden=true; $('fsBtn').onclick=()=>{ $('menuDlg').close(); document.fullscreenElement?document.exitFullscreen():fs.requestFullscreen().catch(()=>{}); };
@@ -527,7 +537,7 @@ function wire(){
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){ e.preventDefault(); saveProject(); return; } if(e.ctrlKey||e.metaKey) return;
     if(e.key==='Escape'){ if(mode==='rec') stopRecording(); if(mode==='play') stopPlay(); return; }
     if(mode==='setup'&&(e.key==='r'||e.key==='R')){ startRecording(false); return; }
-    if(/^[1-9]$/.test(e.key)&&(mode==='rec'||mode==='setup')){ const r=project.pads[+e.key-1]; if(r) hitPad(r); return; }
+    if(/^[1-9]$/.test(e.key)&&(mode==='rec'||mode==='setup')){ const r=scenePads()[+e.key-1]; if(r) hitPad(r); return; }
     if(mode!=='setup'&&mode!=='rec') return;
     if(e.key==='Tab'&&document.activeElement===cv){ const it=cur().items; if(it.length){ e.preventDefault(); const i=it.findIndex(x=>x.id===selId); selId=it[(i+(e.shiftKey?-1:1)+it.length)%it.length].id; updateItemBar(); } return; }
     const it=sel(); if(!it) return; const st=e.shiftKey?40:10; let done=true; const once=()=>{ if(mode==='setup'&&!e.repeat) checkpoint(); return target(it); };
@@ -542,7 +552,7 @@ function wire(){
   project=newProject(); curId=project.scenes[0].id; wire(); resize(); refreshAll(); rafId=requestAnimationFrame(tick); micInit();
   window.CutoutApp={get project(){ return project; },get mode(){ return mode; },get playing(){ return playing&&{id:playing.scene.id,t:playing.t,ended:playing.ended}; },get queue(){ return playQueue.length; },poseAt,livePose:id=>{ const p=live.get(id); return p&&{x:Math.round(p.x),y:Math.round(p.y)}; }};
   const saved=await loadAuto();
-  if(saved&&(saved.cast?.length||saved.scenes?.some(s=>s.take||s.items?.length))){
+  if(saved&&(saved.cast?.length||saved.pads?.length||saved.scenes?.some(s=>s.take||s.items?.length))){
     const when=saved.savedAt?new Date(saved.savedAt).toLocaleString():'earlier';
     const v=await ask('Carry on with “'+saved.name+'”?','Last worked on '+when+'. Starting new clears it from this device.',[['Start new',0],['Carry on',1,'primary']]);
     if(v){ await adopt(saved); refreshAll(); } else autosave();

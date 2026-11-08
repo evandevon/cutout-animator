@@ -17,7 +17,7 @@ It runs entirely in the browser. Photos and recordings stay on the device: nothi
 5. **Check the microphone.** The meter beside the Record button shows your volume, and the dropdown chooses a microphone if there's more than one.
 6. **Record.** Your voice, the chosen sounds and every movement are recorded. Drag with a finger or the mouse. On a touch screen, several fingers can move different cutouts at once, and pinching resizes and turns a cutout.
 7. **Teach a move (optional).** Tap a cutout, press Teach a move, drag it and let go. It repeats that move during recording. Grab it and it follows you, then glides back to where you grabbed it and carries on.
-8. **Sound effects (optional).** In the Sounds tab, record your own or tick sounds from the library. Each one becomes a big button under the stage: tap it while recording, or press its number key. On a touch screen, one person can tap sounds while another moves the cutouts and a third does the voice.
+8. **Sound effects (optional).** In the Sounds tab, record your own sounds first. Tick the ones you want on each scene and they become big buttons under the stage: tap one while recording, or press its number key. On a touch screen, one person can tap sounds while another moves the cutouts and a third does the voice. A ready-made sound library can be switched on in the ☰ menu.
 9. **Add more.** Plays the scene back so you can move another cutout or add more voice.
 10. Use **＋ Blank** for a new empty scene, or **Continue story** for a new scene that starts where the selected one finishes. Hold and drag a scene to move it, and tap 🗑 on the selected scene to delete it.
 11. **Make video** makes one video of the whole story, or a separate video for each scene. **Save** downloads a `.cutz` project file that can be reopened and edited from the ☰ menu.
@@ -26,7 +26,7 @@ Work also autosaves on the device and is offered back next time the page opens.
 
 ## Templates for a whole class
 
-1. Print the [template](templates/cutout-template-A4.pdf). It's A4, so print it at A3 size if you want more room to draw. Each sheet has a background box, four character boxes, a script area and sound tickboxes.
+1. Print the [template](templates/cutout-template-A4.pdf). It's A4, so print it at A3 size if you want more room to draw. Each sheet has a background box, four character boxes with movement ticks, a script area, background sound and music ticks, and a space to write down the sound effects to record.
 2. Students fill them in. Dark pens and bright colours work best.
 3. Scan the sheets, then in the ☰ menu choose **Add filled-in templates**. Select JPGs or PDFs with one sheet per page, or use the webcam. Sheets can be crooked or upside down, as long as all four corner squares show.
 4. Check the results, tap a cutout to fix it, and press **Add scenes**. Each sheet becomes one scene. The handwritten script shows on screen during recording.

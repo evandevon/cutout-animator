@@ -7,10 +7,9 @@ const Template=(()=>{
   const L={W:297,H:210,marks:[[13,13],[284,13],[284,197],[13,197]],
     bg:{x:10,y:22,w:160,h:90},script:{x:10,y:118,w:160,h:70},
     chars:[{x:176,y:22,w:53,h:38},{x:234,y:22,w:53,h:38},{x:176,y:72,w:53,h:38},{x:234,y:72,w:53,h:38}],
-    tickSize:6,animDy:39.5,animSize:5,animDx:[0,13.5,27,40.5],cols:[176,213,250],rowY:i=>128+i*9.5};
+    tickSize:6,animDy:39.5,animSize:5,animDx:[0,13.5,27,40.5],cols:[176,201],rowY:i=>128+i*9.5};
   const AMB=[['syn:rain','Rain'],['syn:wind','Wind'],['syn:ocean','Ocean'],['syn:forest','Forest']];
   const MUS=[['mus:happy','Happy'],['mus:adventure','Adventure'],['mus:spooky','Spooky'],['mus:sleepy','Sleepy']];
-  const FX=[['Classic Cartoon/Spring Bounce 1.mp3','Boing'],['Classic Cartoon/Bam.mp3','Bam'],['Classic Cartoon/Pop 1.mp3','Pop'],['Classic Cartoon/Knock on Door.mp3','Knock'],['Classic Cartoon/Explosion 1.mp3','Explosion'],['Classic Cartoon/Zip In and Zip Out.mp3','Zip']];
   const ANIM=[['sway','Sway'],['hop','Hop'],['float','Float'],['spin','Spin']];
   // Blank paper between the boxes: used to measure the lighting across the page, so shadows and warm light can be evened out.
   const PAPER=[]; for(let y=30;y<=185;y+=15){ PAPER.push([5,y],[292,y],[173,y]); } for(let y=26;y<=58;y+=8) PAPER.push([231.5,y],[231.5,y+50]); for(let y=132;y<=176;y+=11) PAPER.push([209.5,y],[246,y]); for(let x=30;x<=270;x+=20) PAPER.push([x,191]);
@@ -84,7 +83,7 @@ const Template=(()=>{
     const tick=(x,y,s=L.tickSize)=>{ const c=warp(src,sw,sh,H,{x:x+1.1,y:y+1.1,w:s-2.2,h:s-2.2},8,light); return inked(c,P)>.16; };
     const pickOne=(list,col)=>{ const i=list.findIndex((_,n)=>tick(L.cols[col],L.rowY(n))); return i<0?null:list[i][0]; };
     const bgC=warp(src,sw,sh,H,inset(L.bg),10,light),scriptC=warp(src,sw,sh,H,inset(L.script),9,light);
-    const sheet={name,amb:pickOne(AMB,0),mus:pickOne(MUS,1),fx:FX.filter((_,n)=>tick(L.cols[2],L.rowY(n))).map(x=>x[0]),chars:[],
+    const sheet={name,amb:pickOne(AMB,0),mus:pickOne(MUS,1),chars:[],
       bg:inked(bgC,P)>.004?bgC:null,script:inked(scriptC,P)>.003?scriptC:null};
     for(const b of L.chars){
       // Look a little past the box, in case the drawing goes over its edge.
@@ -132,7 +131,7 @@ const Template=(()=>{
       btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); },ch.rect); const cap=(ch.anim?ANIM.find(a=>a[0]===ch.anim)[1]:'Still')+(ch.over?' · past the box':''); const f=fig(cap,btn); if(ch.over){ f.classList.add('over'); btn.title='This drawing went past its box. Tap to check it.'; } });
     if(s.script) fig('Script',canvasThumb(s.script,'wideimg'));
     row.append(w);
-    const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); if(s.fx.length) parts.push('Effects: '+s.fx.map(r=>labelOf(FX,r)).join(', ')); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);
+    const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);
     $('tplRows').append(row);
   }
   function stopCam(){ clearInterval(camT); if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('tplVideo').srcObject=null; $('tplCam').hidden=true; }
@@ -152,5 +151,5 @@ const Template=(()=>{
     const d=$('tplDlg'); d.addEventListener('dragover',e=>e.preventDefault()); d.addEventListener('drop',e=>{ e.preventDefault(); const f=[...e.dataTransfer.files]; if(f.length) addFiles(f); });
     d.addEventListener('keydown',e=>{ if(e.code==='Space'&&stream&&!$('capDlg').open&&e.target.tagName!=='BUTTON'){ e.preventDefault(); snap(); } });
   }
-  return {init,open,L,AMB,MUS,FX,ANIM,detect,processCanvas};
+  return {init,open,L,AMB,MUS,ANIM,detect,processCanvas};
 })();
