@@ -49,7 +49,7 @@ The app records movement data and audio, not screen video. Toolbars stay out of 
 
 - Use the HTTPS address above. Camera and microphone don't work from a `file://` page.
 - Video is made frame by frame where the browser can encode it directly, so slow computers just take longer and the result is the same, even if you switch tabs. Older browsers, including older iPad Safari, can only record it in real time with the tab showing: it pauses and restarts if the tab is hidden, and may look jumpy on slow devices.
-- No sound from the speakers? Check **Sound check** in the ☰ menu: play a test sound, pick the speakers, and keep echo cancelling off. On Windows, echo cancelling can make the computer treat it as a phone call and turn the speakers down.
+- Sounds silent or cutting out on Windows? An open microphone can make Windows treat the browser as a phone call and mute other sounds. Fix it in Windows (Sound settings › More sound settings › Communications › "Do nothing"), or in the ☰ menu's **Sound check** untick "Show the microphone level all the time" so the microphone is only on while recording.
 - Headphones give the cleanest voice recording, because the microphone can't pick up the music.
 
 ## Credits

@@ -127,7 +127,7 @@ const Sound = (() => {
   function micStart(deviceId){ if(mic.stream) return Promise.resolve(true); if(!micBusy) micBusy=micOpen(deviceId).finally(()=>micBusy=null); return micBusy; }
   async function micOpen(deviceId){
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) return false;
-    const c=audioCtx(), base={echoCancellation:S.aec,noiseSuppression:S.aec,autoGainControl:true};
+    const c=audioCtx(), base={echoCancellation:S.aec,noiseSuppression:S.aec,autoGainControl:S.aec};
     try{ mic.stream=await navigator.mediaDevices.getUserMedia({audio:deviceId?{...base,deviceId:{exact:deviceId}}:base}); }
     catch(e){ if(!deviceId||e.name==='NotAllowedError') throw e; mic.stream=await navigator.mediaDevices.getUserMedia({audio:base}); } // that microphone has gone: use the default
     mic.src=c.createMediaStreamSource(mic.stream);

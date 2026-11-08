@@ -316,7 +316,7 @@ function finishTake(){
   if(stopAudio){ stopAudio(); stopAudio=null; }
   grabs.clear(); rec=null; live.clear();
 }
-function stopRecording(){ if(mode==='count') return; if(mode!=='rec') return; finishTake(); micOK=false; mode='setup'; setLive(false); refreshAll(); dirty(); toast('Recorded! Press Play to watch it.'); }
+function stopRecording(){ if(mode==='count') return; if(mode!=='rec') return; finishTake(); micOK=false; mode='setup'; if(!keepMic()){ Sound.micStop(); micUI(); } setLive(false); refreshAll(); dirty(); toast('Recorded! Press Play to watch it.'); }
 async function nextScene(){ if(mode!=='rec'||!nextOpen()) return; const i=project.scenes.indexOf(cur()); finishTake(); const n=project.scenes[i+1]; curId=n.id; selId=null; mode='count'; const buf=await preload(n); renderScenes(); showScript(); renderPads(); beginTake(n,false,buf); }
 function showScript(){ const s=cur(),a=(mode==='rec'||mode==='count')&&s.script&&project.assets[s.script],v=$('scriptView'); v.hidden=!a; if(a){ if(!a.__u) a.__u=URL.createObjectURL(a.blob); $('scriptImg').src=a.__u; } }
 function setLive(on){ document.body.classList.toggle('live',on); showScript(); renderPads(); $('transport').hidden=on; $('recBar').hidden=!on; $('stopBtn').querySelector('.sq').hidden=false; $('stopBtn').lastChild.textContent=' Stop'; $('timer').hidden=false; $('micLevelWrap').hidden=!micOK; $('nextSceneBtn').hidden=true; $('timer').textContent='0:00'; resize(); }
@@ -324,12 +324,15 @@ function setLive(on){ document.body.classList.toggle('live',on); showScript(); r
 /* ---------- live microphone meter and picker ---------- */
 function micPref(v){ try{ if(v===undefined) return localStorage.getItem('ca-mic')||''; localStorage.setItem('ca-mic',v); }catch(_){ return ''; } }
 function paintMeter(){ const l=Sound.mic.stream?Sound.mic.level:0, pct=l>.002?clamp((20*Math.log10(l)+50)/50,0,1)*100:0; document.querySelectorAll('.micBar').forEach(b=>{ b.style.width=pct+'%'; b.classList.toggle('hot',l>.92); }); }
-function micUI(msg){ const on=!!Sound.mic.stream,want=$('voiceOn').checked; $('micMeter').hidden=!on; $('micEnable').hidden=on||!want||!!msg; $('micMsg').hidden=!msg; $('micMsg').textContent=msg||''; if(!on) $('micSel').hidden=true; }
+function micUI(msg){ const on=!!Sound.mic.stream,want=$('voiceOn').checked; $('micMeter').hidden=!on; $('micEnable').hidden=on||!want||!!msg||!keepMic(); $('micMsg').hidden=!msg; $('micMsg').textContent=msg||''; if(!on) $('micSel').hidden=true; }
 async function micList(){ if(!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices) return; const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput'&&d.deviceId!=='default'&&d.deviceId!=='communications'), active=Sound.mic.stream&&Sound.mic.stream.getAudioTracks()[0]?.getSettings().deviceId;
   for(const s of [$('micSel'),$('sfxMicSel')]){ s.innerHTML=''; ds.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||'Microphone '+(i+1); s.append(o); }); if(active&&ds.some(d=>d.deviceId===active)) s.value=active; }
   $('micSel').hidden=!Sound.mic.stream||ds.length<2; $('sfxMicWrap').hidden=!Sound.mic.stream||!ds.length; }
 async function micOn(){ if(!$('voiceOn').checked) return; try{ await Sound.micStart(micPref()); micUI(); await micList(); }catch(e){ console.warn(e); micUI(e.name==='NotAllowedError'?'Microphone is blocked in the browser settings':"Can't find a microphone"); } }
-async function micInit(){ let st='prompt'; try{ st=(await navigator.permissions.query({name:'microphone'})).state; }catch(_){} if(st==='granted') micOn(); else micUI(st==='denied'?'Microphone is blocked in the browser settings':''); }
+/* Holding the microphone open makes Windows treat the browser as a phone call, and many laptops then mute
+   or turn down every other sound. The always-on level meter can be switched off in the menu. */
+const keepMic=()=>{ try{ return localStorage.getItem('ca-micidle')!=='0'; }catch(_){ return true; } };
+async function micInit(){ if(!keepMic()){ micUI(); return; } let st='prompt'; try{ st=(await navigator.permissions.query({name:'microphone'})).state; }catch(_){} if(st==='granted') micOn(); else micUI(st==='denied'?'Microphone is blocked in the browser settings':''); }
 
 /* ---------- playback ---------- */
 let playing=null,playQueue=[];
@@ -541,7 +544,7 @@ function sfxDraw(){ const cv=$('sfxWave'),buf=sfxX.buf; if(!buf||!cv.isConnected
   if(sfxX.play){ const x=X(sfxX.play()); g.fillStyle='#c8321e'; g.fillRect(x-1,0,2,h); requestAnimationFrame(sfxDraw); } }
 let sfxSrc=null;
 function sfxPlay(){ if(!sfxX.buf) return; const c=Sound.audioCtx(); try{ sfxSrc&&sfxSrc.stop(); }catch(_){} const s=c.createBufferSource(),t0=c.currentTime,len=sfxX.b-sfxX.a; s.buffer=sfxX.buf; s.connect(Sound.master(c)); s.start(0,sfxX.a,len); sfxSrc=s; const a=sfxX.a; sfxX.play=()=>{ const t=a+(c.currentTime-t0); if(t>=a+len){ sfxX.play=null; } return Math.min(t,a+len); }; s.onended=()=>{ sfxX.play=null; sfxDraw(); }; sfxDraw(); }
-function sfxClose(){ clearInterval(sfxTimer); try{ sfxSrc&&sfxSrc.stop(); }catch(_){} sfxX.play=null; Sound.mic.chunks=null; $('sfxDlg').close(); if(!$('voiceOn').checked){ Sound.micStop(); micUI(); } }
+function sfxClose(){ clearInterval(sfxTimer); try{ sfxSrc&&sfxSrc.stop(); }catch(_){} sfxX.play=null; Sound.mic.chunks=null; $('sfxDlg').close(); if(!$('voiceOn').checked||!keepMic()){ Sound.micStop(); micUI(); } }
 function sfxTrimmed(){ const buf=sfxX.buf,d=buf.duration; if(sfxX.a<.005&&sfxX.b>d-.005) return sfxX.blob; const sr=buf.sampleRate,s=Math.floor(sfxX.a*sr),e=Math.ceil(sfxX.b*sr),ch=buf.numberOfChannels,out=new Float32Array(e-s);
   for(let k=0;k<ch;k++){ const c=buf.getChannelData(k); for(let i=s;i<e;i++) out[i-s]+=c[i]/ch; } const f=Math.min(out.length>>1,Math.round(sr*.008)); for(let i=0;i<f;i++){ out[i]*=i/f; out[out.length-1-i]*=i/f; } return Sound.wav([out],out.length,sr); }
 function swapRef(from,to){ const f=r=>r===from?to:r; project.pads=project.pads.map(f); for(const s of project.scenes){ if(s.pads) s.pads=s.pads.map(f); s.ambience=f(s.ambience); s.music=f(s.music); if(s.take&&s.take.fx) s.take.fx.forEach(x=>x.ref=f(x.ref)); } }
@@ -582,6 +585,7 @@ function wire(){
   if(pref('ca-out')) Sound.setSink(pref('ca-out'));
   $('outSel').onchange=e=>{ pref('ca-out',e.target.value); Sound.setSink(e.target.value); Sound.testTone(); };
   $('testSound').onclick=()=>Sound.testTone();
+  $('micIdle').checked=keepMic(); $('micIdle').onchange=e=>{ pref('ca-micidle',e.target.checked?'1':'0'); if(e.target.checked) micOn(); else { Sound.micStop(); micUI(); } };
   $('menuBtn').addEventListener('click',fillOut);
   const setLib=v=>{ $('sfxLibWrap').hidden=!v; $('libToggle').checked=v; try{ localStorage.setItem('ca-sfxlib',v?'1':''); }catch(_){} if(!v) stopLibPreview(); };
   try{ setLib(localStorage.getItem('ca-sfxlib')==='1'); }catch(_){ setLib(false); } $('libToggle').onchange=e=>setLib(e.target.checked);
@@ -603,7 +607,7 @@ function wire(){
   $('micSel').onchange=async e=>{ micPref(e.target.value); Sound.micStop(); await micOn(); };
   $('sfxMicSel').onchange=async e=>{ if($('sfxRecGo').classList.contains('going')) return; micPref(e.target.value); Sound.micStop(); try{ await Sound.micStart(e.target.value); }catch(_){ $('sfxMsg').textContent="That microphone couldn't be opened."; } micUI(); await micList(); };
   if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange',()=>{ if(mode==='setup') micList(); });
-  document.addEventListener('visibilitychange',()=>{ if(mode!=='setup') return; if(document.hidden){ if(Sound.mic.stream){ Sound.micStop(); micUI.resume=true; } } else if(micUI.resume){ micUI.resume=false; micOn(); } }); // don't hold the mic while the tab is hidden
+  document.addEventListener('visibilitychange',()=>{ if(mode!=='setup') return; if(document.hidden){ if(Sound.mic.stream){ Sound.micStop(); micUI.resume=true; } } else if(micUI.resume){ micUI.resume=false; if(keepMic()) micOn(); } }); // don't hold the mic while the tab is hidden
   window.addEventListener('pointerdown',()=>Sound.audioCtx(),{once:true});
   $('recBtn').onclick=()=>startRecording(false); $('layerBtn').onclick=()=>startRecording(true); $('stopBtn').onclick=()=>{ mode==='play'?stopPlay():stopRecording(); }; $('nextSceneBtn').onclick=nextScene;
   $('playBtn').onclick=()=>play([cur()]); $('playAllBtn').onclick=()=>play(project.scenes);
