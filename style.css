@@ -21,7 +21,7 @@ button:disabled{opacity:.35;cursor:default}
 .spacer{flex:1}.hint{color:var(--muted);font-size:.87rem;margin:.3rem 0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 input[type=range]{flex:1;min-width:5rem;accent-color:var(--accent);height:2rem}
-select,#askInput,#projName{font:inherit;min-height:var(--tap);padding:.3rem .5rem;border:2px solid var(--line);border-radius:.5rem;background:#fff;color:var(--ink);min-width:0;-webkit-user-select:text;user-select:text}
+select,#askInput,#projName,#sfxName{font:inherit;min-height:var(--tap);padding:.3rem .5rem;border:2px solid var(--line);border-radius:.5rem;background:#fff;color:var(--ink);min-width:0;-webkit-user-select:text;user-select:text}
 #top{min-width:0;display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;padding-top:max(.5rem,env(safe-area-inset-top))}
 #top h1{font-size:1.25rem;margin:0 .4rem 0 0;white-space:nowrap}
 #projName{width:clamp(5rem,16vw,16rem);flex:0 1 auto}
@@ -98,6 +98,7 @@ fieldset{border:0;padding:0;margin:0 0 .5rem}legend{font-weight:700;padding:0}.e
 .padItem{display:flex;align-items:center;gap:.35rem;font-size:.9rem;font-weight:600}.padItem .check{flex:1;min-width:0;min-height:2.4rem}.padItem .check span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#padListHead .hint{font-weight:600;font-size:.75rem}.padItem button{min-height:2.4rem;box-shadow:none}
 .sfxMeter{display:flex;align-items:center;gap:.6rem;margin:.5rem 0}.sfxMeter .meter{flex:1;width:auto;height:1.3rem}#sfxTime{font-weight:800;min-width:3.5rem}
 #sfxWave{width:100%;height:120px;display:block;border:2px solid var(--line);border-radius:.5rem;touch-action:none;cursor:ew-resize;background:#fff}.sfxTrim{display:flex;gap:.8rem;font-size:.85rem;font-weight:700}.sfxTrim label{flex:1;display:flex;align-items:center;gap:.3rem}#sfxLen{font-weight:800;align-self:center}
+#sfxMicSel{width:100%}
 #sfxRecGo.going{background:var(--ink)}.sfxRow{justify-content:flex-start;margin-top:0}#sfxMsg{font-weight:700;color:var(--rec);min-height:1em;margin:.4rem 0}#sfxDlg{width:min(30rem,94vw)}
 body.live #top,body.live #side,body.live #scenes{display:none!important}
 body.live{grid-template-rows:minmax(0,1fr)}body.live #main{grid-template-columns:minmax(0,1fr);padding:.5rem}
