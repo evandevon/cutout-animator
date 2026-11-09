@@ -87,7 +87,10 @@ select,#askInput,#projName,#sfxName{font:inherit;min-height:var(--tap);padding:.
 .scene.on{outline:4px solid var(--accent)}.scene .num{position:absolute;left:0;top:0;background:var(--ink);color:#fff;font-size:.8rem;padding:0 .35rem}
 .scene .tick{position:absolute;right:0;bottom:0;background:var(--rec);color:#fff;font-size:.72rem;padding:0 .3rem}
 #addScene{flex:none;width:clamp(5.5rem,10vw,12rem);aspect-ratio:16/9;min-height:0;font-size:.9rem;font-weight:800;padding:0;border-style:dashed;box-shadow:none;flex-direction:column;gap:0;line-height:1}#addScene .plus{font-size:1.7rem;line-height:1}
-#contScene{flex:none;width:clamp(5.5rem,10vw,12rem);aspect-ratio:16/9;min-height:0;padding:.1rem .2rem;font-size:.85rem;font-weight:800;line-height:1.05;white-space:normal;background:#ffe08a;box-shadow:none}
+#contScene{flex:none;width:clamp(5.5rem,10vw,12rem);aspect-ratio:16/9;min-height:0;padding:.2rem;font-size:.8rem;font-weight:800;line-height:1.05;white-space:nowrap;background:#ffe08a;box-shadow:none;flex-direction:column;gap:.2rem}
+#contScene .mini{position:relative;width:55%;aspect-ratio:16/9;border:2px solid var(--line);border-radius:.3rem;overflow:hidden;display:block;flex:none}
+#contScene .mini canvas{width:100%;height:100%;display:block}
+#contScene .mini .num{position:absolute;left:0;top:0;background:var(--ink);color:#fff;font-size:.6rem;padding:0 .25rem}
 fieldset{border:0;padding:0;margin:0 0 .5rem}legend{font-weight:700;padding:0}.expRow{display:flex;align-items:center;gap:.4rem;margin-top:.35rem}.expRow b{flex:1}#expList{max-height:30vh;overflow-y:auto}
 .libTabs{display:flex;gap:.35rem;flex:none;overflow-x:auto;padding:3px}.libTabs button{flex:none}.libTabs button.on{background:var(--ink);color:var(--paper)}
 #libGrid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(7rem,14vw,14rem),1fr));gap:.5rem;padding:3px;align-content:start;grid-auto-rows:max-content}
@@ -96,7 +99,6 @@ fieldset{border:0;padding:0;margin:0 0 .5rem}legend{font-weight:700;padding:0}.e
 #libDlg .hint{margin:0;flex:none}
 .scene{touch-action:none}.scene.lifted{transform:scale(1.08) rotate(-2deg);box-shadow:4px 6px 0 #0004;z-index:2;opacity:.92}
 .trash{position:absolute;top:0;right:0;width:1.9rem;height:1.9rem;background:#fff;border-left:2px solid var(--line);border-bottom:2px solid var(--line);border-bottom-left-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1rem;cursor:pointer}
-.copyS{position:absolute;left:0;bottom:0;width:1.9rem;height:1.9rem;background:#fff;border-right:2px solid var(--line);border-top:2px solid var(--line);border-top-right-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;cursor:pointer}
 .pad .trash{border-top-right-radius:.7rem;width:1.8rem;height:1.8rem}
 .pad kbd{font:800 .75rem "Nunito",sans-serif;background:#fff;border:1.5px solid var(--line);border-radius:.3rem;padding:0 .3rem;opacity:.8}
 .padItem{display:flex;align-items:center;gap:.35rem;font-size:.9rem;font-weight:600}.padItem .check{flex:1;min-width:0;min-height:2.4rem}.padItem .check span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#padListHead .hint{font-weight:600;font-size:.75rem}.padItem button{min-height:2.4rem;box-shadow:none}
