@@ -20,8 +20,21 @@
   <input type="file" id="openInput" hidden>
 </header>
 
+<!-- Phones: a slim rail of buttons that slide panels over the stage, so the stage gets the whole screen -->
+<nav id="rail" aria-label="Panels">
+  <button data-open="cast" aria-label="Cutouts">✂️<span class="railLab">Cutouts</span></button>
+  <button data-open="back" aria-label="Backdrop">🏞️<span class="railLab">Backdrop</span></button>
+  <button data-open="sound" aria-label="Sounds">🎵<span class="railLab">Sounds</span></button>
+  <button data-open="scenes" aria-label="Scenes">🎞️<span class="railLab">Scenes</span></button>
+  <span class="railGap"></span>
+  <button class="railUndo" aria-label="Undo">↶</button>
+  <button class="railRedo" aria-label="Redo">↷</button>
+</nav>
+<div id="scrim" hidden></div>
+
 <main id="main">
   <aside id="side">
+    <div class="drawerHead"><b class="drawerTitle"></b><button class="drawerX" aria-label="Close panel">✕</button></div>
     <div class="tabs" role="tablist">
       <button role="tab" data-tab="cast" class="on">✂️ Cutouts</button>
       <button role="tab" data-tab="back">🏞️ Backdrop</button>
@@ -116,6 +129,7 @@
 </main>
 
 <footer id="scenes">
+  <div class="drawerHead"><b>Scenes</b><button class="drawerX" aria-label="Close panel">✕</button></div>
   <div id="sceneList" aria-label="Scenes"></div>
 </footer>
 

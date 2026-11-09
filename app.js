@@ -38,7 +38,11 @@ function checkpoint(){ undoStack.push(snap()); if(undoStack.length>40) undoStack
 function restoreSnap(s){ Object.assign(project,JSON.parse(s)); if(!project.scenes.find(x=>x.id===curId)) curId=project.scenes[0].id; selId=null; refreshAll(); dirty(); }
 function undo(){ if(mode!=='setup'||!undoStack.length) return; redoStack.push(snap()); restoreSnap(undoStack.pop()); undoBtns(); }
 function redo(){ if(mode!=='setup'||!redoStack.length) return; undoStack.push(snap()); restoreSnap(redoStack.pop()); undoBtns(); }
-function undoBtns(){ $('undoBtn').disabled=!undoStack.length; $('redoBtn').disabled=!redoStack.length; }
+function undoBtns(){ $('undoBtn').disabled=!undoStack.length; $('redoBtn').disabled=!redoStack.length; document.querySelector('.railUndo').disabled=!undoStack.length; document.querySelector('.railRedo').disabled=!redoStack.length; }
+/* Phone panels: the rail slides one panel over the stage at a time. */
+const DRAWER={cast:'Cutouts',back:'Backdrop',sound:'Sounds',scenes:'Scenes'};
+function drawer(k){ const b=document.body; if(!k||b.dataset.drawer===k){ delete b.dataset.drawer; } else { b.dataset.drawer=k; if(k!=='scenes'){ const t=document.querySelector(`.tabs [data-tab=${k}]`); if(t&&!t.classList.contains('on')) t.click(); document.querySelector('#side .drawerTitle').textContent=DRAWER[k]; } }
+  $('scrim').hidden=!b.dataset.drawer; document.querySelectorAll('#rail [data-open]').forEach(x=>{ const on=x.dataset.open===b.dataset.drawer; x.classList.toggle('on',on); x.setAttribute('aria-pressed',on); }); if(b.dataset.drawer!=='sound') stopLibPreview(); }
 let saveT,thumbT;
 function dirty(){ clearTimeout(saveT); saveT=setTimeout(autosave,1200); clearTimeout(thumbT); thumbT=setTimeout(renderScenes,250); }
 const DB=()=>new Promise((res,rej)=>{ const r=indexedDB.open('cutout-animator',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
@@ -322,7 +326,7 @@ function finishTake(){
 function stopRecording(){ if(mode==='count') return; if(mode!=='rec') return; finishTake(); micOK=false; mode='setup'; if(!keepMic()){ Sound.micStop(); micUI(); } else if(!Sound.mic.stream) micOn(); setLive(false); refreshAll(); dirty(); toast('Recorded! Press Play to watch it.'); }
 async function nextScene(){ if(mode!=='rec'||!nextOpen()) return; const i=project.scenes.indexOf(cur()); finishTake(); const n=project.scenes[i+1]; curId=n.id; selId=null; mode='count'; const buf=await preload(n); renderScenes(); showScript(); renderPads(); beginTake(n,false,buf); }
 function showScript(){ const s=cur(),a=(mode==='rec'||mode==='count')&&s.script&&project.assets[s.script],v=$('scriptView'); v.hidden=!a; if(a){ if(!a.__u) a.__u=URL.createObjectURL(a.blob); $('scriptImg').src=a.__u; } }
-function setLive(on){ document.body.classList.toggle('live',on); showScript(); renderPads(); $('transport').hidden=on; $('recBar').hidden=!on; $('stopBtn').querySelector('.sq').hidden=false; $('stopBtn').lastChild.textContent=' Stop'; $('timer').hidden=false; $('micLevelWrap').hidden=!micOK; $('nextSceneBtn').hidden=true; $('timer').textContent='0:00'; resize(); }
+function setLive(on){ if(on) drawer(null); document.body.classList.toggle('live',on); showScript(); renderPads(); $('transport').hidden=on; $('recBar').hidden=!on; $('stopBtn').querySelector('.sq').hidden=false; $('stopBtn').lastChild.textContent=' Stop'; $('timer').hidden=false; $('micLevelWrap').hidden=!micOK; $('nextSceneBtn').hidden=true; $('timer').textContent='0:00'; resize(); }
 
 /* ---------- live microphone meter and picker ---------- */
 function micPref(v){ try{ if(v===undefined) return localStorage.getItem('ca-mic')||''; localStorage.setItem('ca-mic',v); }catch(_){ return ''; } }
@@ -634,6 +638,9 @@ function wire(){
   const removeSel=()=>{ const it=sel(); if(!it) return; checkpoint(); const s=cur(); unstickFrom(s,[it.id]); s.items=s.items.filter(x=>x.id!==it.id); if(s.take) delete s.take.tracks[it.id]; selId=null; updateItemBar(); refreshHint(); dirty(); };
   $('itDel').onclick=removeSel;
   $('undoBtn').onclick=undo; $('redoBtn').onclick=redo;
+  document.querySelector('.railUndo').onclick=undo; document.querySelector('.railRedo').onclick=redo;
+  document.querySelectorAll('#rail [data-open]').forEach(x=>x.onclick=()=>drawer(x.dataset.open));
+  $('scrim').onpointerdown=e=>{ e.preventDefault(); drawer(null); }; document.querySelectorAll('.drawerX').forEach(x=>x.onclick=()=>drawer(null));
   $('newBtn').onclick=async()=>{ $('menuDlg').close(); if(!await ask('Start a new project?','Anything you have not saved as a project file will be lost.',[['Cancel',null],['Start new',1,'danger']])) return; await adopt(newProject()); undoStack=[]; redoStack=[]; refreshAll(); autosave(); };
   $('saveBtn').onclick=saveProject; $('openBtn').onclick=()=>{ $('menuDlg').close(); $('openInput').click(); }; $('openInput').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) openProject(f); };
   $('scriptView').onclick=()=>$('scriptView').hidden=true; $('tplBtn').onclick=()=>{ $('menuDlg').close(); Template.open(); }; $('menuBtn').onclick=()=>$('menuDlg').showModal(); $('menuClose').onclick=()=>$('menuDlg').close(); $('helpBtn').onclick=()=>{ $('menuDlg').close(); $('helpDlg').showModal(); }; $('helpClose').onclick=()=>$('helpDlg').close();
@@ -644,6 +651,7 @@ function wire(){
   window.addEventListener('keydown',e=>{
     const tag=e.target.tagName; if(tag==='INPUT'&&e.target.type!=='range'&&e.target.type!=='checkbox'||tag==='SELECT'||document.querySelector('dialog[open]')) return;
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){ e.preventDefault(); saveProject(); return; } if(e.ctrlKey||e.metaKey) return;
+    if(e.key==='Escape'&&document.body.dataset.drawer&&mode==='setup'){ drawer(null); return; }
     if(e.key==='Escape'&&linkPick){ linkCancel(); return; }
     if(e.key==='Escape'){ if(mode==='rec') stopRecording(); if(mode==='play') stopPlay(); return; }
     if(mode==='setup'&&(e.key==='r'||e.key==='R')){ startRecording(false); return; }

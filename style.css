@@ -125,34 +125,72 @@ dialog.full[open]{display:flex;flex-direction:column;gap:.5rem}
 #toast{position:fixed;left:50%;bottom:7rem;transform:translateX(-50%);background:var(--ink);color:#fff;padding:.6rem 1rem;border-radius:.5rem;z-index:100;font-weight:600;max-width:90vw;width:max-content;text-align:center}
 @media (max-width:1300px){#itemBar .lab2{display:none}}
 html.bigUI #itemBar .lab2{display:none}
-/* Narrow screens: stage on top, chooser panel fills what's left. */
+#rail,.drawerHead,#scrim{display:none}
+/* ---------- Phones: the stage gets the screen; panels slide over it from a slim rail ---------- */
+@media (max-height:520px) and (orientation:landscape),(max-width:760px) and (orientation:portrait){
+  :root{--tap:40px}
+  #top h1,.lab2,#side .tabs,#undoBtn,#redoBtn{display:none}
+  #main,#center{display:contents}
+  #rail{display:flex;gap:.3rem;grid-area:rail;z-index:21;min-height:0}
+  #rail button{min-height:38px;padding:.15rem .1rem;flex-direction:column;gap:0;font-size:1.2rem;line-height:1.05}
+  .railLab{font-size:.6rem;font-weight:800}
+  #rail button.on{background:var(--accent);color:#fff}
+  #stageWrap{grid-area:stage}#top{grid-area:top}#transport{grid-area:trans}#padRow{grid-area:trans}#scriptView{grid-area:script}
+  #scrim:not([hidden]){display:block;position:fixed;inset:0;background:#0005;z-index:19}
+  #side,#scenes{display:none!important;position:fixed;z-index:20;background:var(--card);border:2px solid var(--line);border-radius:.8rem;box-shadow:3px 4px 0 #0005;overflow:hidden}
+  body[data-drawer=cast] #side,body[data-drawer=back] #side,body[data-drawer=sound] #side{display:flex!important}
+  body[data-drawer=scenes] #scenes{display:flex!important;flex-direction:column;align-items:stretch;padding:0;gap:0}
+  #scenes #sceneList{padding:.5rem}
+  .drawerHead{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.2rem .25rem .2rem .7rem;border-bottom:2px solid var(--line);flex:none;font-size:1.05rem;background:var(--paper)}
+  .drawerX{min-height:2.2rem;min-width:2.4rem;padding:0;box-shadow:none}
+  .scene,#addScene,#contScene{width:7.5rem}
+  #itemBar{flex-wrap:nowrap;overflow-x:auto;max-width:calc(100% - .5rem);justify-content:flex-start;scrollbar-width:none;padding:2px 2px 4px}
+  #itemBar::-webkit-scrollbar{display:none}
+  #itemBar button{min-height:36px;flex:none}.animSet{flex:none;border-right:0}
+  body.live #rail{display:none}
+}
+/* Phone on its side: tool rail | stage | record column */
+@media (max-height:520px) and (orientation:landscape){
+  body,body.live{grid-template-columns:auto minmax(0,1fr) 6.8rem;grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"rail stage trans" "rail stage top";gap:.4rem;padding:max(.35rem,env(safe-area-inset-top)) max(.4rem,env(safe-area-inset-right)) max(.35rem,env(safe-area-inset-bottom)) max(.4rem,env(safe-area-inset-left))}
+  body.live{grid-template-areas:"script stage trans" "script stage top"}
+  #recBar{grid-area:top}
+  #rail{flex-direction:column;overflow-y:auto;scrollbar-width:none}#rail button{width:3.4rem;flex:none}.railGap{flex:1}
+  #top{flex-wrap:wrap;padding:0;gap:.3rem;align-content:end}#projName{display:none}
+  #top button{flex:1 1 0;min-height:38px;padding:0;min-width:0}
+  #transport{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:.3rem;overflow-y:auto;min-height:0;padding:2px}
+  #transport button{min-height:38px;padding:.1rem .3rem;font-size:.9rem;white-space:normal;line-height:1.05}
+  .rec{font-size:1.1rem;padding-inline:.4rem;min-height:46px!important}
+  #micBox{margin:0;flex-wrap:wrap;justify-content:center;gap:.25rem}
+  #micEnable{font-size:.75rem;white-space:normal;width:100%}
+  #micSel{width:100%;max-width:none;font-size:.75rem;min-height:30px}.meter{width:3rem}
+  #padRow{flex-direction:column;flex-wrap:nowrap;max-height:none;min-height:0;overflow-y:auto}
+  .pad{flex:none;min-height:44px;font-size:.85rem}
+  #recBar{flex-direction:column;align-items:stretch;gap:.3rem;flex-wrap:nowrap}#stopBtn{min-width:0}#recBar button{min-height:40px;white-space:normal}
+  #timer{font-size:1.3rem;text-align:center;min-width:0}#recBar .meter{width:100%}
+  body.live #scriptView{width:9rem;height:auto;align-self:stretch}
+  #toast{bottom:.8rem}
+  #side{left:calc(3.4rem + .8rem);top:.35rem;bottom:.35rem;width:min(21rem,58vw)}
+  #scenes{left:calc(3.4rem + .8rem);right:calc(6.8rem + .8rem);bottom:.35rem}
+}
+/* Phone upright: slim top bar, stage, record row, rail along the bottom */
 @media (max-width:760px) and (orientation:portrait){
-  #top h1{display:none}.lab2{display:none}
-  #top .spacer{display:none}#projName{flex:1;width:auto}
-  #main{display:flex;flex-direction:column;gap:.4rem;padding:0 .5rem}
-  #center{flex:none;order:-1}#side{flex:1;min-height:5rem}#transport{flex-wrap:nowrap}#micBox{gap:.3rem}.meter{width:3rem}#micSel{min-width:0}
-  #stageWrap{flex:none;padding-top:calc(4.8rem + .9rem);height:calc((100vw - 1rem)*.4787 + 5.7rem)}
-  .animSet{border-right:0}
-  #itemBar{top:.3rem}
+  body,body.live{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto auto;grid-template-areas:"top" "stage" "script" "trans" "rail";gap:0}
+  #recBar{grid-area:rail;padding:.4rem .5rem max(.4rem,env(safe-area-inset-bottom))}
+  #top{padding:max(.4rem,env(safe-area-inset-top)) .5rem .4rem;gap:.35rem}#top .spacer{display:none}#projName{flex:1;width:auto;min-width:0}
+  #top button{min-height:40px;padding:0 .55rem}
+  #stageWrap{margin:0 .4rem}
+  #itemBar{flex-wrap:wrap;justify-content:center;overflow:visible}
+  body:not(.live) #stageWrap::after{content:"🔄 Turn your phone sideways for a bigger stage";position:absolute;bottom:.45rem;left:0;right:0;text-align:center;color:#fff9;font-size:.8rem;font-weight:700;pointer-events:none}
+  #transport{padding:.4rem .5rem 0;flex-wrap:wrap;gap:.4rem}#transport button{padding-inline:.6rem}#micBox{gap:.3rem}.meter{width:3rem}#micSel{max-width:5.5rem;min-width:0}
+  #micEnable{font-size:.8rem;white-space:normal;line-height:1.05;padding:.1rem .4rem}
   .rec{padding-inline:.9rem;font-size:1.05rem}
-  #micSel{max-width:5.5rem}
-  #scenes{padding-inline:.5rem;gap:.2rem;flex-wrap:wrap}#sceneList{flex:1 0 100%}
-  .scene,#addScene,#contScene{width:4.8rem}
-  body.live #scriptView{height:18vh}body.live #stageWrap{flex:1;height:auto;padding-top:0}body.live #center{flex:1}
+  #padRow{padding:.4rem .5rem 0;max-height:calc(2*(var(--tap) + 1rem))}
+  body.live #scriptView{height:16vh;margin:.4rem .5rem 0;width:auto}
+  #rail{flex-direction:row;padding:.4rem .5rem max(.4rem,env(safe-area-inset-bottom))}#rail button{flex:1 1 0;min-width:0}.railGap{flex:0 0 .2rem}
+  #toast{bottom:9.5rem}
+  #side{left:.4rem;right:.4rem;bottom:calc(38px + 1.6rem + env(safe-area-inset-bottom));height:min(62dvh,34rem)}
+  #scenes{left:.4rem;right:.4rem;bottom:calc(38px + 1.6rem + env(safe-area-inset-bottom))}
   .capBody{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,1.2fr)}
   #capSource.capBody{grid-template-rows:minmax(0,1.3fr) auto}
-}
-/* Phones on their side: keep the stage as big as possible. */
-@media (max-height:520px) and (orientation:landscape){
-  #top h1,.lab2{display:none}#top{padding-block:.2rem}
-  #main{grid-template-columns:12rem minmax(0,1fr)}
-  :root{--tap:40px}
-  #top button,#transport button{min-height:38px;padding-block:0}
-  #itemBar button{min-height:34px}
-  .scene,#addScene,#contScene{width:4.5rem}#scenes{padding-block:.2rem}#sceneList{padding-block:3px}
-  #transport{flex-wrap:nowrap;overflow-x:auto;padding:2px}
-  .pad{min-height:38px;font-size:.85rem;flex-basis:5rem}#padRow{max-height:42px}#scriptView{height:18vh}
-  .rec{font-size:1rem;padding-inline:.7rem}#micSel{max-width:7rem}.meter{width:3.5rem}
-  .tabs button{min-height:34px;font-size:.75rem}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
