@@ -46,7 +46,9 @@ function drawer(k){ const b=document.body; if(!k||b.dataset.drawer===k){ delete 
 let saveT,thumbT;
 function dirty(){ clearTimeout(saveT); saveT=setTimeout(autosave,1200); clearTimeout(thumbT); thumbT=setTimeout(renderScenes,250); }
 const DB=()=>new Promise((res,rej)=>{ const r=indexedDB.open('cutout-animator',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
-async function autosave(){ if(mode!=='setup') return dirty(); try{ const d=await DB(); await new Promise((res,rej)=>{ const t=d.transaction('kv','readwrite'); t.objectStore('kv').put({...project,savedAt:Date.now(),curId},'auto'); t.oncomplete=res; t.onerror=()=>rej(t.error); }); d.close(); }catch(e){ console.warn('autosave',e); } }
+async function autosave(){ if(mode!=='setup') return dirty(); try{ const d=await DB(); await new Promise((res,rej)=>{ const t=d.transaction('kv','readwrite'); t.objectStore('kv').put({...project,assets:cleanAssets(project.assets),savedAt:Date.now(),curId},'auto'); t.oncomplete=res; t.onerror=()=>rej(t.error); }); d.close(); }catch(e){ console.warn('autosave',e); } }
+/* Assets carry page-only extras (like __u, a blob: link that dies on reload); keep those out of saves. */
+const cleanAssets=A=>Object.fromEntries(Object.entries(A).map(([k,a])=>[k,Object.fromEntries(Object.entries(a).filter(([f])=>!f.startsWith('__')))]));
 async function loadAuto(){ try{ const d=await DB(); const v=await new Promise((res,rej)=>{ const q=d.transaction('kv').objectStore('kv').get('auto'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); d.close(); return v; }catch(_){ return null; } }
 
 /* ---------- assets ---------- */
@@ -114,7 +116,7 @@ const cv=$('stage'),ctx=cv.getContext('2d'); let vs=1,dpr=1;
 function resize(){ const wr=$('stageWrap'),cs=getComputedStyle(wr),b={width:wr.clientWidth,height:wr.clientHeight-parseFloat(cs.paddingTop)}; if(!b.width||b.height<=0) return; dpr=Math.min(2.5,devicePixelRatio||1); const k=Math.min(b.width/VW,b.height/VH),cw=Math.floor(VW*k),ch=Math.floor(VH*k);
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; cv.width=Math.floor(cw*dpr); cv.height=Math.floor(ch*dpr); vs=cv.width/VW; }
 new ResizeObserver(resize).observe($('stageWrap'));
-function poseNow(it){ if(mode==='rec') return live.get(it.id)||it; if(mode==='play'&&playing) return poseAt(it,playing.scene.take,playing.t); if(mode==='setup'&&it.id!==selId&&loopOn(it)) return loopPose(it,performance.now()/1000); return it; }
+function poseNow(it){ if(mode==='rec') return live.get(it.id)||it; if(mode==='play'&&playing) return poseAt(it,playing.scene.take,playing.t); return it; } // taught moves only play when playing or recording; setup shows their path instead (drawPaths)
 function nowT(){ const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches; return mode==='rec'&&rec?recTime():playing?playing.t:reduce?0:performance.now()/1000; }
 function matsNow(){ return sceneMats(playing?playing.scene:cur(),poseNow,nowT()); }
 const centreOf=e=>mapp(e.m,0,0);
@@ -139,12 +141,26 @@ function render(){
     if(linkPick){ ctx.font=`${Math.round(24*px)}px sans-serif`; for(const o of linkCands()){ const e=mats.get(o.id); if(!e) continue; const [x,y]=centreOf(e); ctx.beginPath(); ctx.arc(x,y,28*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } } }
   if((mode==='setup'||mode==='rec'||mode==='count')&&!linkPick){ ctx.font=`${Math.round(22*px)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; const held=new Set([...grabs.values()].filter(g=>g.group).map(g=>g.id));
     for(const s of scene.items){ if(!scene.items.some(o=>o.link===s.id)||(mode!=='setup'&&s.fixed)) continue; const e=mats.get(s.id); if(!e) continue; const [x,y]=centreOf(e),on=held.has(s.id); ctx.beginPath(); ctx.arc(x,y,(on?26:22)*px,0,7); ctx.fillStyle=on?'#fff3c4':'#ffe08aee'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } }
-  drawTrail(mats,px);
+  drawPaths(scene,mats,px); drawTrail(mats,px);
   const it=sel();
   if(it&&mode!=='play'){ const c=cornersOf(mats.get(it.id)); if(c){ ctx.setLineDash([8*px,6*px]); ctx.lineWidth=2*px; ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(...c.tl); ctx.lineTo(...c.tr); ctx.lineTo(...c.br); ctx.lineTo(...c.bl); ctx.closePath(); ctx.stroke(); ctx.strokeStyle='#000'; ctx.lineDashOffset=8*px; ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset=0;
       if(!linkPick){ ctx.beginPath(); ctx.arc(c.tr[0],c.tr[1],13*px,0,7); ctx.fillStyle='#0b6e6e'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.strokeStyle='#fff'; ctx.stroke(); } } }
 }
 
+/* In setup, cutouts with a taught move stand still (so they're easy to grab) and show the path they'll follow. */
+function drawPaths(scene,mats,px){
+  if(mode!=='setup'||teach&&teach.active) return; ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+  for(const it of scene.items){ if(!loopOn(it)) continue; const e=mats.get(it.id); if(!e) continue; const P=e.P||I6,on=it.id===selId,F=it.loop.frames;
+    const pts=F.map(f=>{ const q=loopPose(it,f[0]); return mapp(P,q.x,q.y); }); if(pts.length<2) continue;
+    ctx.beginPath(); ctx.moveTo(...pts[0]); for(const q of pts) ctx.lineTo(...q); ctx.closePath();
+    ctx.globalAlpha=on?1:.55; ctx.setLineDash([]); ctx.lineWidth=(on?8:6)*px; ctx.strokeStyle='#2a232077'; ctx.stroke();
+    ctx.setLineDash([.1,(on?12:14)*px]); ctx.lineWidth=(on?6:4)*px; ctx.strokeStyle='#ffe08a'; ctx.stroke(); ctx.setLineDash([]);
+    const [x,y]=pts[0]; ctx.beginPath(); ctx.arc(x,y,(on?9:7)*px,0,7); ctx.fillStyle='#fffaf0'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.strokeStyle='#2a2320'; ctx.stroke();
+    // a small arrowhead partway along, so the direction is clear
+    const k=Math.min(pts.length-1,Math.max(2,pts.length/4|0)),[ax,ay]=pts[k],[bx,by]=pts[k-2],ang=Math.atan2(ay-by,ax-bx),r=(on?14:11)*px;
+    ctx.beginPath(); ctx.moveTo(ax+Math.cos(ang)*r,ay+Math.sin(ang)*r); ctx.lineTo(ax+Math.cos(ang+2.5)*r,ay+Math.sin(ang+2.5)*r); ctx.lineTo(ax+Math.cos(ang-2.5)*r,ay+Math.sin(ang-2.5)*r); ctx.closePath(); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.lineWidth=2*px; ctx.stroke(); }
+  ctx.restore();
+}
 /* While teaching a move: a faint copy where it started, a dotted trail of where it has been,
    and a start ring that turns green when it's back home, so the loop joins up smoothly. */
 function drawTrail(mats,px){
@@ -479,7 +495,7 @@ async function openProject(file){ try{ const z=await JSZip.loadAsync(file),pj=z.
     for(const id in metas){ const m=metas[id],b=await z.file(m.file).async('blob'); p.assets[id]={...m,blob:new Blob([b],{type:m.type})}; }
     await adopt(p); undoStack=[]; redoStack=[]; refreshAll(); dirty(); toast('Opened '+p.name); }
   catch(e){ console.warn(e); toast("That isn't a Cutout Animator project file (.cutz)."); } }
-async function adopt(p){ imgs.clear(); hitMaps.clear(); p.mix=p.mix||{voice:1,ambience:.5,music:.4,fx:1}; project=p; curId=p.curId&&p.scenes.find(s=>s.id===p.curId)?p.curId:p.scenes[0].id; delete project.curId; delete project.savedAt; project.pads=project.pads||[]; for(const s of project.scenes) if(!s.pads) s.pads=[...project.pads]; /* older projects showed every button on every scene */ for(const s of project.scenes) for(const i of s.items) if(i.alive){ i.anim='sway'; delete i.alive; } selId=null; for(const a of Object.values(project.assets)) if(a.kind!=='audio'){ try{ await loadImg(a); }catch(_){ } } }
+async function adopt(p){ imgs.clear(); hitMaps.clear(); p.assets=cleanAssets(p.assets||{}); p.mix=p.mix||{voice:1,ambience:.5,music:.4,fx:1}; project=p; curId=p.curId&&p.scenes.find(s=>s.id===p.curId)?p.curId:p.scenes[0].id; delete project.curId; delete project.savedAt; project.pads=project.pads||[]; for(const s of project.scenes) if(!s.pads) s.pads=[...project.pads]; /* older projects showed every button on every scene */ for(const s of project.scenes) for(const i of s.items) if(i.alive){ i.anim='sway'; delete i.alive; } selId=null; for(const a of Object.values(project.assets)) if(a.kind!=='audio'){ try{ await loadImg(a); }catch(_){ } } }
 
 /* ---------- video export ---------- */
 async function mixAll(scenes,total){ const sr=48000,off=new OfflineAudioContext(2,Math.max(1,Math.ceil(total*sr)),sr); let at=0; for(const s of scenes){ const buf=await preload(s); Sound.schedule(off,Sound.master(off),s,at,buf,project.mix,{dur:s.take.dur,withTake:true}); at+=s.take.dur; } return off.startRendering(); }
