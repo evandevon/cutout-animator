@@ -96,6 +96,7 @@ fieldset{border:0;padding:0;margin:0 0 .5rem}legend{font-weight:700;padding:0}.e
 #libDlg .hint{margin:0;flex:none}
 .scene{touch-action:none}.scene.lifted{transform:scale(1.08) rotate(-2deg);box-shadow:4px 6px 0 #0004;z-index:2;opacity:.92}
 .trash{position:absolute;top:0;right:0;width:1.9rem;height:1.9rem;background:#fff;border-left:2px solid var(--line);border-bottom:2px solid var(--line);border-bottom-left-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1rem;cursor:pointer}
+.copyS{position:absolute;left:0;bottom:0;width:1.9rem;height:1.9rem;background:#fff;border-right:2px solid var(--line);border-top:2px solid var(--line);border-top-right-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;cursor:pointer}
 .pad .trash{border-top-right-radius:.7rem;width:1.8rem;height:1.8rem}
 .pad kbd{font:800 .75rem "Nunito",sans-serif;background:#fff;border:1.5px solid var(--line);border-radius:.3rem;padding:0 .3rem;opacity:.8}
 .padItem{display:flex;align-items:center;gap:.35rem;font-size:.9rem;font-weight:600}.padItem .check{flex:1;min-width:0;min-height:2.4rem}.padItem .check span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#padListHead .hint{font-weight:600;font-size:.75rem}.padItem button{min-height:2.4rem;box-shadow:none}
