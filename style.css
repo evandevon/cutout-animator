@@ -48,10 +48,11 @@ select,#askInput,#projName,#sfxName{font:inherit;min-height:var(--tap);padding:.
 #emptyHint p{margin:0 0 .6rem;font-size:1.35rem}#emptyHint div{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center}
 #countdown{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:min(30vh,11rem);font-weight:900;color:#fff;background:#0006;pointer-events:none}
 #itemBar{position:absolute;top:.35rem;left:50%;transform:translateX(-50%);display:flex;gap:.3rem;z-index:2;max-width:100%;flex-wrap:wrap;justify-content:center;width:max-content}
-#itemBar button{min-height:2.4rem;padding:.2rem .55rem;font-size:.9rem;box-shadow:1px 1px 0 var(--line)}
+#itemBar button{min-height:2.4rem;padding:.15rem .4rem .1rem;font-size:1.05rem;box-shadow:1px 1px 0 var(--line);flex-direction:column;gap:0;line-height:1.1;min-width:2.9rem}
+#itemBar .lab2{display:block!important;font-size:.66rem;font-weight:800;line-height:1;margin-top:.12rem}
 .animSet{display:inline-flex;gap:.2rem;padding-right:.35rem;margin-right:.1rem;border-right:2px solid #fff6}
 [data-anim].on,#itLoop.on,#itFixed.on,#itLink.on{background:#ffe08a;outline:3px solid #ffe08a}
-[data-anim]{font-size:1.15rem!important}
+[data-anim]{font-size:1.15rem!important}#itemBar [data-anim]{font-size:1.1rem!important}
 #teachHint{position:absolute;bottom:.5rem;left:50%;transform:translateX(-50%);color:#fff;background:#0b6e6e;padding:.5rem .9rem;border-radius:.5rem;pointer-events:none;font-weight:700;text-align:center;max-width:90%;z-index:2}
 #padRow{display:flex;gap:.5rem;flex-wrap:wrap;flex:none;max-height:calc(2*(var(--tap) + 1.5rem));overflow-y:auto;padding:2px}
 .pad{position:relative;padding-right:2.2rem;flex:1 1 7rem;min-height:calc(var(--tap) + .9rem);font-size:1.05rem;background:#ffe08a;white-space:normal;line-height:1.1;touch-action:none}
@@ -123,8 +124,6 @@ dialog.full[open]{display:flex;flex-direction:column;gap:.5rem}
 #expVideo{width:100%;background:#000;border-radius:.5rem}progress{width:100%;height:1.1rem}
 #askInput{width:100%}
 #toast{position:fixed;left:50%;bottom:7rem;transform:translateX(-50%);background:var(--ink);color:#fff;padding:.6rem 1rem;border-radius:.5rem;z-index:100;font-weight:600;max-width:90vw;width:max-content;text-align:center}
-@media (max-width:1300px){#itemBar .lab2{display:none}}
-html.bigUI #itemBar .lab2{display:none}
 #rail,.drawerHead,#scrim{display:none}
 /* ---------- Phones: the stage gets the screen; panels slide over it from a slim rail ---------- */
 @media (max-height:520px) and (orientation:landscape),(max-width:760px) and (orientation:portrait){
@@ -146,7 +145,7 @@ html.bigUI #itemBar .lab2{display:none}
   .scene,#addScene,#contScene{width:7.5rem}
   #itemBar{flex-wrap:nowrap;overflow-x:auto;max-width:calc(100% - .5rem);justify-content:flex-start;scrollbar-width:none;padding:2px 2px 4px}
   #itemBar::-webkit-scrollbar{display:none}
-  #itemBar button{min-height:36px;flex:none}.animSet{flex:none;border-right:0}
+  #itemBar button{min-height:36px;flex:none;font-size:.95rem;padding-inline:.3rem;min-width:2.6rem}#itemBar .lab2{font-size:.56rem}.animSet{flex:none;border-right:0}
   body.live #rail{display:none}
 }
 /* Phone on its side: tool rail | stage | record column */

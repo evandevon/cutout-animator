@@ -139,9 +139,25 @@ function render(){
     if(linkPick){ ctx.font=`${Math.round(24*px)}px sans-serif`; for(const o of linkCands()){ const e=mats.get(o.id); if(!e) continue; const [x,y]=centreOf(e); ctx.beginPath(); ctx.arc(x,y,28*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } } }
   if((mode==='setup'||mode==='rec'||mode==='count')&&!linkPick){ ctx.font=`${Math.round(22*px)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; const held=new Set([...grabs.values()].filter(g=>g.group).map(g=>g.id));
     for(const s of scene.items){ if(!scene.items.some(o=>o.link===s.id)||(mode!=='setup'&&s.fixed)) continue; const e=mats.get(s.id); if(!e) continue; const [x,y]=centreOf(e),on=held.has(s.id); ctx.beginPath(); ctx.arc(x,y,(on?26:22)*px,0,7); ctx.fillStyle=on?'#fff3c4':'#ffe08aee'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke(); ctx.fillStyle='#2a2320'; ctx.fillText('🔗',x,y+1*px); } }
+  drawTrail(mats,px);
   const it=sel();
   if(it&&mode!=='play'){ const c=cornersOf(mats.get(it.id)); if(c){ ctx.setLineDash([8*px,6*px]); ctx.lineWidth=2*px; ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(...c.tl); ctx.lineTo(...c.tr); ctx.lineTo(...c.br); ctx.lineTo(...c.bl); ctx.closePath(); ctx.stroke(); ctx.strokeStyle='#000'; ctx.lineDashOffset=8*px; ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset=0;
       if(!linkPick){ ctx.beginPath(); ctx.arc(c.tr[0],c.tr[1],13*px,0,7); ctx.fillStyle='#0b6e6e'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.strokeStyle='#fff'; ctx.stroke(); } } }
+}
+
+/* While teaching a move: a faint copy where it started, a dotted trail of where it has been,
+   and a start ring that turns green when it's back home, so the loop joins up smoothly. */
+function drawTrail(mats,px){
+  if(!teach||!teach.active||mode!=='setup') return; const e=mats.get(teach.id); if(!e) return; const c=centreOf(e);
+  if(!teach.ghost){ teach.ghost=e; teach.trail=[c]; }
+  const T=teach.trail,L=T[T.length-1]; if(Math.hypot(c[0]-L[0],c[1]-L[1])>3) T.push(c);
+  ctx.save(); ctx.globalAlpha=.28; drawWith(ctx,teach.ghost); ctx.restore();
+  ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.beginPath(); ctx.moveTo(...T[0]); for(const q of T) ctx.lineTo(...q); ctx.lineTo(...c);
+  ctx.lineWidth=9*px; ctx.strokeStyle='#2a232088'; ctx.stroke(); ctx.setLineDash([.1,12*px]); ctx.lineWidth=6*px; ctx.strokeStyle='#ffe08a'; ctx.stroke(); ctx.setLineDash([]);
+  const s=T[0],gone=T.some(q=>Math.hypot(q[0]-s[0],q[1]-s[1])>60),home=gone&&Math.hypot(c[0]-s[0],c[1]-s[1])<40;
+  ctx.beginPath(); ctx.arc(s[0],s[1],(home?24:18)*px,0,7); ctx.fillStyle=home?'#2a9d4a':'#fffaf0'; ctx.fill(); ctx.lineWidth=3*px; ctx.strokeStyle='#2a2320'; ctx.stroke();
+  ctx.font=`900 ${Math.round(15*px)}px "Nunito",sans-serif`; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.lineWidth=4*px; ctx.strokeStyle='#2a2320'; ctx.strokeText(home?'Let go!':'Start',s[0],s[1]-(home?28:22)*px); ctx.fillStyle='#fff'; ctx.fillText(home?'Let go!':'Start',s[0],s[1]-(home?28:22)*px);
+  ctx.beginPath(); ctx.arc(c[0],c[1],7*px,0,7); ctx.fillStyle='#ffe08a'; ctx.fill(); ctx.lineWidth=2.5*px; ctx.stroke(); ctx.restore();
 }
 
 /* ---------- pointer control: every finger moves its own cutout ---------- */
@@ -205,7 +221,7 @@ function relink(scene,it,to){
   if(to) it.link=to; else delete it.link;
 }
 function unstickFrom(scene,ids){ for(const o of scene.items) if(o.link&&ids.includes(o.link)&&!ids.includes(o.id)){ const m=scene.items.find(i=>i.id===o.link); relink(scene,o,m&&m.link&&!ids.includes(m.link)?m.link:null); } }
-function teachStart(){ const it=sel(); if(!it) return; linkCancel(); if(teach){ teach=null; showHint(''); return; } teach={id:it.id,active:false}; showHint('Drag it the way it should move, then let go'); }
+function teachStart(){ const it=sel(); if(!it) return; linkCancel(); if(teach){ teach=null; showHint(''); return; } teach={id:it.id,active:false}; showHint('Drag it the way it should move. Bring it back to the start, then let go.'); }
 function teachTick(now){ if(!teach||!teach.active) return; const it=cur().items.find(i=>i.id===teach.id); if(!it) return; const t=(now-teach.t0)/1000; if(t-teach.lastT<1/30) return; teach.lastT=t; const s=teach.start; teach.frames.push([r3(t),r3(it.x-s.x),r3(it.y-s.y),r3(it.s/s.s),r3(it.r-s.r)]); }
 function teachEnd(){ const it=cur().items.find(i=>i.id===teach.id),T=teach; teach=null; $('teachHint').hidden=true; if(!it) return; const s=T.start,F=T.frames; const far=F.reduce((a,f)=>Math.max(a,Math.hypot(f[1],f[2])),0),last=F[F.length-1];
   Object.assign(it,{x:s.x,y:s.y,s:s.s,r:s.r});
