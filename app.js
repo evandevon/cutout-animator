@@ -98,7 +98,26 @@ function sceneMats(scene,poseOf,t,anim=true){ const by=new Map(scene.items.map(i
   const get=(it,depth)=>{ let r=out.get(it.id); if(r) return r; const im=imgs.get(it.assetId),p=poseOf(it),par=it.link&&depth<16?by.get(it.link):null,P=par?get(par,depth+1).m:I6;
     r={it,p,P,im,m:mmul(P,localMat(it,p,im,anim?t:null))}; out.set(it.id,r); return r; };
   for(const it of scene.items) get(it,0); return out; }
-function drawWith(c,e){ if(!e||!e.im) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(e.im,-w/2,-h/2,w,h); c.restore(); }
+function drawWith(c,e){ if(!e||!e.im) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]);
+  const E=e.it&&e.it.edge?paperEdge(e.im):null; if(E) c.drawImage(E.c,-w/2-E.pad,-h/2-E.pad); else c.drawImage(e.im,-w/2,-h/2,w,h); c.restore(); }
+/* "Paper edge": a rough white border, as if the drawing was cut out with scissors a little way outside the lines,
+   with a soft shadow so it looks like paper sitting on the backdrop. Made once per picture and kept. */
+const edges=new WeakMap();
+function paperEdge(im){ let E=edges.get(im); if(E) return E; const w=im.naturalWidth,h=im.naturalHeight; if(!w||!h||!im.complete) return null;
+  const r=Math.round(clamp(Math.max(w,h)*.024,5,34)),pad=r+Math.ceil(r*.6)+4,W2=w+2*pad,H2=h+2*pad;
+  const sil=document.createElement('canvas'); sil.width=W2; sil.height=H2; const g=sil.getContext('2d'); g.drawImage(im,pad,pad,w,h); g.globalCompositeOperation='source-in'; g.fillStyle='#fff'; g.fillRect(0,0,W2,H2);
+  const grow=k=>{ const o=document.createElement('canvas'); o.width=W2; o.height=H2; const q=o.getContext('2d',{willReadFrequently:true}); const n=Math.max(12,Math.round(k*1.6));
+    q.drawImage(sil,0,0); for(const f of [1,.55]) for(let i=0;i<n;i++){ const a=i/n*Math.PI*2; q.drawImage(sil,Math.cos(a)*k*f,Math.sin(a)*k*f); } return q.getImageData(0,0,W2,H2).data; };
+  const outer=grow(r),inner=grow(r*.4);
+  // a coarse grid of random values, blended between grid points: where it's high the border reaches out, where it's low it's trimmed close
+  const cell=Math.max(4,r*1.5),gw=Math.ceil(W2/cell)+2,gh=Math.ceil(H2/cell)+2,G=new Float32Array(gw*gh); let seed=(w*73856093^h*19349663)>>>0; const rnd=()=>((seed=Math.imul(seed^seed>>>15,2246822519)+0x9e3779b9>>>0)/4294967296); for(let i=0;i<G.length;i++) G[i]=rnd();
+  const out=document.createElement('canvas'); out.width=W2; out.height=H2; const oc=out.getContext('2d'),id=oc.createImageData(W2,H2),D=id.data;
+  for(let y=0;y<H2;y++){ const gy=y/cell,y0=gy|0,fy=gy-y0; for(let x=0;x<W2;x++){ const i=(y*W2+x)*4,o=outer[i+3]; if(!o) continue; let a=inner[i+3];
+      if(a<255){ const gx=x/cell,x0=gx|0,fx=gx-x0,j=y0*gw+x0,v=(G[j]*(1-fx)+G[j+1]*fx)*(1-fy)+(G[j+gw]*(1-fx)+G[j+gw+1]*fx)*fy; a=Math.max(a,o*clamp((v-.4)*9,0,1)); }
+      D[i]=D[i+1]=D[i+2]=255; D[i+3]=a; } }
+  oc.putImageData(id,0,0); const c=document.createElement('canvas'); c.width=W2; c.height=H2; const cc=c.getContext('2d');
+  cc.save(); cc.shadowColor='rgba(0,0,0,.28)'; cc.shadowBlur=Math.max(2,r*.5); cc.shadowOffsetX=r*.12; cc.shadowOffsetY=r*.22; cc.drawImage(out,0,0); cc.restore();
+  cc.drawImage(out,0,0); cc.drawImage(im,pad,pad,w,h); E={c,pad}; edges.set(im,E); return E; }
 function cornersOf(e){ if(!e||!e.im) return null; const w=e.im.naturalWidth/2,h=e.im.naturalHeight/2,A=(x,y)=>mapp(e.m,x,y); return {tl:A(-w,-h),tr:A(w,-h),br:A(w,h),bl:A(-w,h)}; }
 function drawScene(c,scene,poseOf,t=0,mats){ mats=mats||sceneMats(scene,poseOf,t); c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); drawBackdrop(c,scene.backdrop); for(const it of scene.items) drawWith(c,mats.get(it.id)); c.restore(); }
 const loopOn=it=>!!(it.loop&&it.loop.on);
@@ -253,6 +272,7 @@ function rebase(id){ // when fingers join or leave a cutout, restart the gesture
   if(pts.length===1&&pts[0].kind==='drag'){ pts[0].ox=cx-pts[0].x; pts[0].oy=cy-pts[0].y; }
   if(pts.length>=2){ const [a,b]=pts; it.__g={d:Math.hypot(a.x-b.x,a.y-b.y)||1,a:Math.atan2(b.y-a.y,b.x-a.x),s:p.s,r:p.r,cx,cy,mx:(a.x+b.x)/2,my:(a.y+b.y)/2}; }
 }
+document.addEventListener('pointerdown',()=>{ try{ Sound.wake(60); }catch(_){} },true); // any tap keeps the speakers ready for a minute
 cv.addEventListener('pointerdown',e=>{
   if(mode==='play'||mode==='count'){ return; } e.preventDefault(); cv.focus({preventScroll:true}); try{ cv.setPointerCapture(e.pointerId); }catch(_){}
   const [x,y]=world(e); setupMoved=false;
@@ -298,7 +318,7 @@ async function startRecording(layer,again){
   if(mode!=='setup') return; const scene=cur();
   if(!scene.items.length&&!layer&&!again){ const v=await ask('Nothing on stage yet','Add a cutout first, or record anyway to narrate over just the backdrop.',[['Go back',null],['Record anyway',1,'primary']]); if(!v) return; }
   if(scene.take&&!layer&&!again){ const v=await ask('Replace this recording?','Scene '+(project.scenes.indexOf(scene)+1)+' already has a recording. You can Undo afterwards.',[['Keep it',null],['Replace','y','danger']]); if(!v) return; }
-  Sound.audioCtx(); selId=layer?selId:null; updateItemBar();
+  Sound.audioCtx(); Sound.wake(36000); selId=layer?selId:null; updateItemBar(); // speakers stay awake for the whole recording
   voiceWanted=$('voiceOn').checked; micOK=false;
   micHold=0; micPaused=false; clearTimeout(micBackT);
   if(voiceWanted){ await micOn(); micOK=!!Sound.mic.stream; if(!micOK) toast("The microphone isn't available, so this recording has no voice."); }
@@ -312,7 +332,7 @@ async function startRecording(layer,again){
 function beginTake(scene,layer,buf){
   const c=Sound.audioCtx(); live.clear();
   for(const it of scene.items){ const p=layer?poseAt(it,scene.take,0):it; live.set(it.id,{x:p.x,y:p.y,s:p.s,r:p.r,flip:!!p.flip,tilt:p.tilt||0}); }
-  const t0=c.currentTime+.04;
+  const t0=c.currentTime+.04; console.info('Recording started. Sound: '+c.state+', delay to speakers about '+Math.round(((c.outputLatency||0)+(c.baseLatency||0))*1000)+' ms');
   rec={scene,layer:!!layer,t0,tracks:{},last:{},over:{},loopS:{},fx:[],prevT:0,lastPush:{},vel:{}};
   for(const [id,p] of live) rec.last[id]={...p};
   stopAudio=Sound.schedule(c,Sound.master(c),scene,t0,buf,mixNow(),{dur:Infinity,withTake:!!layer});
@@ -344,7 +364,7 @@ function sample(t,dt){
 }
 const r3=n=>Math.round(n*1000)/1000;
 const frame=(t,p)=>[r3(t),r3(p.x),r3(p.y),r3(p.s),r3(p.r),p.flip?1:0,r3(p.tilt)];
-function finishTake(){
+function finishTake(){ Sound.wake(60,true);
   if(!rec) return; const t=recTime(), scene=rec.scene;
   sample(t,1/60);
   for(const it of scene.items){ const tr=rec.tracks[it.id],p=live.get(it.id); if(tr&&p&&Math.abs(tr[tr.length-1][1]-p.x)+Math.abs(tr[tr.length-1][2]-p.y)>.05) tr.push(frame(t,p)); }
@@ -397,11 +417,11 @@ async function play(scenes,preview){
 }
 async function playNext(){
   const scene=playQueue.shift(); if(!scene){ stopPlay(); return; }
-  curId=scene.id; renderScenes(); const buf=await preload(scene); if(mode!=='play') return; const c=Sound.audioCtx(), t0=c.currentTime+.06;
+  curId=scene.id; renderScenes(); const buf=await preload(scene); if(mode!=='play') return; const c=Sound.audioCtx(), awake=Sound.wake(36000), t0=c.currentTime+(awake?.06:.45); // give sleeping speakers a moment to wake
   stopAudio=Sound.schedule(c,Sound.master(c),scene,t0,buf,mixNow(),{dur:playPreview?Infinity:scene.take.dur,withTake:true});
   playing={scene,t0,t:0,preview:playPreview,end:scene.take?scene.take.dur:0};
 }
-function stopPlay(){ $('timer').classList.remove('note'); if(playRel){ playRel(); playRel=null; } if(stopAudio){ stopAudio(); stopAudio=null; } playing=null; playQueue=[]; mode='setup'; setLive(false); refreshAll(); }
+function stopPlay(){ Sound.wake(60,true); $('timer').classList.remove('note'); if(playRel){ playRel(); playRel=null; } if(stopAudio){ stopAudio(); stopAudio=null; } playing=null; playQueue=[]; mode='setup'; setLive(false); refreshAll(); }
 
 function tick(now){
   rafId=requestAnimationFrame(tick); const dt=Math.min(.1,(now-lastTick)/1000||.016); lastTick=now;
@@ -496,7 +516,7 @@ $('sceneList').addEventListener('touchmove',e=>{ if(sd&&sd.on) e.preventDefault(
 function showCurrentScene(){ const on=$('sceneList').querySelector('.scene.on'); if(on) on.scrollIntoView({block:'nearest',inline:'nearest'}); }
 function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?prev.take.dur:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; n.pads=[...(prev.pads||[])]; const ids=new Map(prev.items.map(i=>[i.id,uid()])); n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:ids.get(it.id),...(it.link&&ids.has(it.link)?{link:ids.get(it.link)}:{}),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,fixed:!!it.fixed,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
 function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
-function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); const l=$('itLink'),m=it.link&&cur().items.find(i=>i.id===it.link); l.classList.toggle('on',!!m); l.innerHTML=m?'🔗<span class="lab2"> Unstick</span>':'🔗<span class="lab2"> Stick to…</span>'; l.setAttribute('aria-label',m?'Stuck to '+nameOf(m)+'. Press to unstick':'Stick to another cutout'); l.title=m?'Stuck to '+nameOf(m)+'. Press to unstick.':'Make this follow another cutout'; } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
+function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ $('itEdge').classList.toggle('on',!!it.edge); $('itEdge').setAttribute('aria-pressed',!!it.edge); { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); const l=$('itLink'),m=it.link&&cur().items.find(i=>i.id===it.link); l.classList.toggle('on',!!m); l.innerHTML=m?'🔗<span class="lab2"> Unstick</span>':'🔗<span class="lab2"> Stick to…</span>'; l.setAttribute('aria-label',m?'Stuck to '+nameOf(m)+'. Press to unstick':'Stick to another cutout'); l.title=m?'Stuck to '+nameOf(m)+'. Press to unstick.':'Make this follow another cutout'; } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
 function refreshTransport(){ const s=cur(),any=project.scenes.some(x=>x.take); $('playBtn').hidden=false; $('layerBtn').hidden=!s.take; $('playAllBtn').hidden=project.scenes.filter(x=>x.take).length<2; $('recBtn').lastChild.textContent=s.take?' Redo':' Record'; }
 function refreshAll(){ $('projName').value=project.name; renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
 
@@ -680,6 +700,7 @@ function wire(){
   $('projName').oninput=e=>{ project.name=e.target.value; dirty(); };
   $('itFlip').onclick=flip;
   $('itLink').onclick=linkStart;
+  $('itEdge').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.edge=!it.edge; updateItemBar(); dirty(); };
   $('itFixed').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.fixed=!it.fixed; updateItemBar(); dirty(); toast(it.fixed?'Pinned: it stays put while recording, and taps go through it.':'Not pinned: you can drag it while recording.',2400); };
   $('itLoop').onclick=()=>{ const it=sel(); if(!it) return; if(it.loop){ checkpoint(); it.loop.on=!it.loop.on; updateItemBar(); dirty(); } else teachStart(); };
   $('itLoopRedo').onclick=teachStart;

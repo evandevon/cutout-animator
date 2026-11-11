@@ -134,11 +134,18 @@ const Template=(()=>{
     const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background sound: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);
     $('tplRows').append(row);
   }
-  function stopCam(){ clearInterval(camT); if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('tplVideo').srcObject=null; $('tplCam').hidden=true; }
+  /* A thin green box round the edge of the sheet, drawn over the camera picture. */
+  function outline(f,g){ const o=$('tplOver'),v=$('tplVideo'),r=window.devicePixelRatio||1,cw=o.clientWidth,ch=o.clientHeight; o.width=Math.round(cw*r); o.height=Math.round(ch*r); const x=o.getContext('2d'); x.clearRect(0,0,o.width,o.height);
+    if(!f||!v.videoWidth) return; const H=homography(L.marks,f.pts); if(!H) return; const k=Math.min(cw/v.videoWidth,ch/v.videoHeight),ox=(cw-v.videoWidth*k)/2,oy=(ch-v.videoHeight*k)/2;
+    const P=([X,Y])=>{ const d=H[6]*X+H[7]*Y+1,u=(H[0]*X+H[1]*Y+H[2])/d,w=(H[3]*X+H[4]*Y+H[5])/d; return [(ox+u/g.width*v.videoWidth*k)*r,(oy+w/g.height*v.videoHeight*k)*r]; };
+    x.beginPath(); [[0,0],[L.W,0],[L.W,L.H],[0,L.H]].forEach((q,i)=>x[i?'lineTo':'moveTo'](...P(q))); x.closePath(); x.lineJoin='round';
+    x.lineWidth=4*r; x.strokeStyle='#0008'; x.stroke(); x.lineWidth=2*r; x.strokeStyle='#2ee35f'; x.stroke(); }
+  function stopCam(){ $('tplView').classList.remove('found'); outline(null); clearInterval(camT); if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('tplVideo').srcObject=null; $('tplCam').hidden=true; }
   function grab(){ const v=$('tplVideo'); if(!v.videoWidth) return null; return toWork(v,v.videoWidth,v.videoHeight); }
   async function startCam(){ if(stream){ stopCam(); return; } $('tplCam').hidden=false; const st=$('tplCamMsg'); st.textContent='Starting camera…';
     try{ const c={width:{ideal:2560},height:{ideal:1440}}; if(devs[devI]) c.deviceId={exact:devs[devI].deviceId}; else c.facingMode={ideal:'environment'}; stream=await navigator.mediaDevices.getUserMedia({video:c,audio:false}); const v=$('tplVideo'); v.srcObject=stream; await v.play().catch(()=>{}); devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'); $('tplCamNext').hidden=devs.length<2;
-      camT=setInterval(()=>{ const g=grab(); if(!g) return; const ok=detect(g); st.textContent=ok?'✓ Sheet found. Press Capture.':'Show the whole sheet with all four corner squares'; st.classList.toggle('found',!!ok); $('tplSnap').classList.toggle('primary',!!ok); },450);
+      let miss=0; camT=setInterval(()=>{ const g=grab(); if(!g) return; const f=detect(g); if(f) miss=0; else if(++miss<2&&$('tplView').classList.contains('found')) return; // one missed look doesn't count, so the green doesn't flicker
+        const ok=!!f; st.textContent=ok?'✓ Sheet found. Press Capture.':'Show the whole sheet with all four corner squares'; st.classList.toggle('found',ok); $('tplSnap').classList.toggle('primary',ok); $('tplView').classList.toggle('found',ok); outline(f,g); },300);
     }catch(e){ st.textContent="The camera isn't available on this device."; stream=null; } }
   async function snap(){ const g=grab(); if(!g||busy) return; const st=$('tplCamMsg'); busy=true; const s=await processCanvas(g,'Webcam sheet '+(sheets.length+1)); busy=false; if(s.error){ st.textContent=s.error+'. Try again.'; return; } sheets.push(s); renderRow(s); count(); toast('Got it. Put the next sheet under the camera.'); }
   function close(){ stopCam(); $('tplDlg').close(); }

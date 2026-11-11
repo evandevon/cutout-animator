@@ -97,6 +97,7 @@
         <button id="itFixed" aria-pressed="false" title="Pinned: it stays put while recording, and taps go through it" aria-label="Pinned">📌<span class="lab2"> Pinned</span></button>
         <button id="itLoop" aria-label="Teach a looping move">🔁<span class="lab2"> Teach a move</span></button>
         <button id="itLoopRedo" aria-label="Teach the move again" title="Teach the move again" hidden>↺<span class="lab2"> Again</span></button>
+        <button id="itEdge" aria-pressed="false" aria-label="Paper edge" title="Paper edge: a rough white border, like it was cut out with scissors">✂️<span class="lab2"> Paper edge</span></button>
         <button id="itFlip" aria-label="Flip">⇄<span class="lab2"> Flip</span></button>
         <button id="itFwd" aria-label="Move in front">⬆<span class="lab2"> Front</span></button>
         <button id="itBack" aria-label="Move behind">⬇<span class="lab2"> Behind</span></button>
@@ -189,7 +190,7 @@
     <input type="file" id="tplInput" multiple accept="image/*,application/pdf,.pdf" hidden>
   </div>
   <div id="tplCam" hidden>
-    <video id="tplVideo" playsinline muted autoplay></video>
+    <div id="tplView"><video id="tplVideo" playsinline muted autoplay></video><canvas id="tplOver" aria-hidden="true"></canvas></div>
     <div class="tplCamSide"><p id="tplCamMsg" aria-live="polite"></p><button id="tplSnap" class="big">📸 Capture</button><button id="tplCamNext" hidden>🔄 Switch camera</button></div>
   </div>
   <p id="tplEmpty" class="hint">Each sheet becomes one scene. You can select lots of files at once, or use a PDF with one sheet per page.</p>
@@ -290,6 +291,8 @@
   </ol>
   <h3>Templates for a whole class</h3>
   <p>In the ☰ menu, print a template. Students draw a backdrop and characters, write a script, tick a background sound and music, and note the sounds they'll make. Then choose <b>Add filled-in templates</b> and pick the scanned JPGs or PDFs, or use a webcam. Each sheet becomes one scene, and the script shows on screen during recording.</p>
+  <h3>Paper edge</h3>
+  <p>Tap a cutout and press <b>✂️ Paper edge</b> to give it a rough white border, as if it was cut out of paper with scissors. It shows in the video too. Press it again to take it off.</p>
   <h3>Pinned cutouts</h3>
   <p>Tap a cutout and press <b>📌 Pinned</b> for things that are part of the place, like trees and houses. A pinned cutout stays put while recording, and taps go straight through it to the cutouts behind. You can still move it while setting up. Library buildings, trees and rocks start pinned. Tap 📌 again to unpin.</p>
   <h3>Sticking cutouts together</h3>

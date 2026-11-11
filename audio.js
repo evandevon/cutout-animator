@@ -76,6 +76,16 @@ const Sound = (() => {
      laptops then turn the speakers right down (or send sound only to headphones). */
   const S={aec:false,sink:''};
   let ctx=null;
+  /* Keep the speakers awake. Many speakers (Bluetooth, HDMI/TV, USB, and some laptop sound chips) switch off after a few
+     seconds of silence and take up to a second to wake, so the first moment of a recording or preview went missing.
+     A far-too-quiet-to-hear hiss (about -75 dB) keeps them on while someone is using the page. It goes straight to the
+     speakers, never into recordings or videos. Returns true if they were already awake. */
+  let keep=null,keepUntil=0,keepT=null;
+  function wake(sec=60,reset){ const c=audioCtx(),was=!!keep,until=performance.now()+sec*1000; keepUntil=reset?until:Math.max(keepUntil,until);
+    if(!keep){ const b=c.createBuffer(1,c.sampleRate,c.sampleRate),d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*1.8e-4;
+      const s=c.createBufferSource(),g=c.createGain(); s.buffer=b; s.loop=true; s.connect(g).connect(c.destination); s.start(); keep=s;
+      const check=()=>{ if(performance.now()<keepUntil){ keepT=setTimeout(check,1000); return; } try{ keep.stop(); }catch(_){} keep=null; }; clearTimeout(keepT); keepT=setTimeout(check,1000); }
+    return was; }
   function audioCtx(){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); if(S.sink&&ctx.setSinkId) ctx.setSinkId(S.sink).catch(()=>{}); } if(ctx.state!=='running') ctx.resume().catch(()=>{}); return ctx; }
 
   const cache=new Map();
@@ -189,5 +199,5 @@ const Sound = (() => {
   function setAec(v){ S.aec=!!v; }
   function setSink(id){ S.sink=id||''; if(ctx&&ctx.setSinkId) ctx.setSinkId(S.sink).catch(()=>{}); }
   function testTone(){ const c=audioCtx(),t=c.currentTime+.05; [523.25,659.25,783.99].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain(); o.type='triangle'; o.frequency.value=f; g.gain.setValueAtTime(0,t+i*.18); g.gain.linearRampToValueAtTime(.35,t+i*.18+.02); g.gain.exponentialRampToValueAtTime(.001,t+i*.18+.5); o.connect(g); g.connect(master(c)); o.start(t+i*.18); o.stop(t+i*.18+.55); }); }
-  return {get aec(){ return S.aec; },setAec,setSink,testTone,canPickOutput:typeof AudioContext!=='undefined'&&'setSinkId' in AudioContext.prototype,wav,master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micReady,micCollect,micCollecting,micTake,micTakeTrimmed,micStop};
+  return {get aec(){ return S.aec; },wake,setAec,setSink,testTone,canPickOutput:typeof AudioContext!=='undefined'&&'setSinkId' in AudioContext.prototype,wav,master,AMBIENCE,MUSIC,audioCtx,buffer,schedule,refsFor,mic,micStart,micReady,micCollect,micCollecting,micTake,micTakeTrimmed,micStop};
 })();
