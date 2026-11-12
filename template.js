@@ -4,15 +4,34 @@
    tools/make_templates.py draws the PDFs from these same numbers. */
 const Template=(()=>{
   const $=id=>document.getElementById(id);
-  const L={W:297,H:210,marks:[[13,13],[284,13],[284,197],[13,197]],
-    bg:{x:10,y:22,w:160,h:90},script:{x:10,y:118,w:160,h:70},
-    chars:[{x:176,y:22,w:53,h:38},{x:234,y:22,w:53,h:38},{x:176,y:72,w:53,h:38},{x:234,y:72,w:53,h:38}],
-    tickSize:6,animDy:39.5,animSize:5,animDx:[0,13.5,27,40.5],cols:[176,201],rowY:i=>128+i*9.5};
-  const AMB=[['syn:rain','Rain'],['syn:wind','Wind'],['syn:ocean','Ocean'],['syn:forest','Forest']];
-  const MUS=[['mus:happy','Happy'],['mus:adventure','Adventure'],['mus:spooky','Spooky'],['mus:sleepy','Sleepy']];
+  /* Every sheet: landscape A4 in millimetres, four corner squares, and (on current sheets) a 4-square page code at the bottom.
+     The numbers must match tools/make_templates.py. */
+  const AMB=[['syn:rain','Rain'],['syn:wind','Wind'],['syn:ocean','Ocean'],['syn:forest','Forest'],['syn:underwater','Underwater'],['syn:night','Night'],['syn:fire','Campfire']];
+  const MUS=[['mus:happy','Happy'],['mus:adventure','Adventure'],['mus:spooky','Spooky'],['mus:sleepy','Sleepy'],['mus:silly','Silly'],['mus:sad','Sad'],['mus:tense','Tense']];
   const ANIM=[['sway','Sway'],['hop','Hop'],['float','Float'],['spin','Spin']];
-  // Blank paper between the boxes: used to measure the lighting across the page, so shadows and warm light can be evened out.
-  const PAPER=[]; for(let y=30;y<=185;y+=15){ PAPER.push([5,y],[292,y],[173,y]); } for(let y=26;y<=58;y+=8) PAPER.push([231.5,y],[231.5,y+50]); for(let y=132;y<=176;y+=11) PAPER.push([209.5,y],[246,y]); for(let x=30;x<=270;x+=20) PAPER.push([x,191]);
+  const STAGES=[['orientation','Orientation'],['complication','Complication'],['next','What happens next'],['resolution','Resolution']];
+  const MARKS=[[13,13],[284,13],[284,197],[13,197]],CODE={x:185,y:197,s:3,p:4.5};
+  const grid=(n,cols,x0,y0,dx,dy,w,h)=>Array.from({length:n},(_,i)=>({x:x0+(i%cols)*dx,y:y0+(i/cols|0)*dy,w,h}));
+  const list=(x,y0,dy,size,n)=>Array.from({length:n},(_,i)=>({x,y:y0+i*dy,s:size}));
+  const STAGE={kind:'stage',bg:{x:10,y:25,w:176,h:99},script:{x:10,y:135,w:176,h:52},who:grid(6,3,196,30,12,8,5.5,5.5).map(b=>({x:b.x,y:b.y,s:5.5})),
+    amb:list(196,62,7.5,5.5,7),mus:list(239,62,7.5,5.5,7),notes:[{x:196,y:142.2,w:91,h:44.8}]};
+  const LAYOUTS={
+    old:{kind:'scene',bg:{x:10,y:22,w:160,h:90},script:{x:10,y:118,w:160,h:70},chars:[{x:176,y:22,w:53,h:38},{x:234,y:22,w:53,h:38},{x:176,y:72,w:53,h:38},{x:234,y:72,w:53,h:38}],
+      anim:{dy:39.5,s:5,dx:[0,13.5,27,40.5]},amb:list(176,128,9.5,6,4),mus:list(201,128,9.5,6,4),notes:[{x:228,y:121,w:59,h:67}]},
+    scene:{kind:'scene',bg:{x:10,y:25,w:160,h:90},script:{x:10,y:127,w:160,h:61},chars:grid(4,2,178,25,58,50,51,35),
+      anim:{dy:36.5,s:4.5,dx:[0,12.75,25.5,38.25]},amb:list(178,128,8.5,5.5,7),mus:list(216,128,8.5,5.5,7),notes:[{x:245,y:127,w:42,h:61}]},
+    cast:{kind:'cast',chars:grid(6,3,10,31,95.5,68,86,52),anim:{dy:53.5,s:4.5,dx:[0,21.5,43,64.5]},notes:[{x:10,y:170,w:277,h:20}]},
+    orientation:{...STAGE,stage:'orientation'},complication:{...STAGE,stage:'complication'},resolution:{...STAGE,stage:'resolution'},
+    next:{...STAGE,stage:'next',part:list(0,122,0,5.5,4).map((b,i)=>({...b,x:196+i*21}))}};
+  const CODES={'1100':'scene','1000':'cast','0100':'orientation','0010':'complication','0110':'next','0001':'resolution','0000':'old'};
+  /* Blank paper between the boxes, used to measure the lighting across the page so shadows and warm light can be evened out. */
+  function paperOf(lay){ const out=[],r=[],add=(b,m=2.5)=>r.push([b.x-m,b.y-m-4,b.x+(b.w||b.s)+m,b.y+(b.h||b.s)+m]);
+    for(const k of ['bg','script']) if(lay[k]) add(lay[k]); for(const k of ['amb','mus','who','part','notes']) (lay[k]||[]).forEach(b=>add(b));
+    (lay.chars||[]).forEach(b=>add({x:b.x,y:b.y,w:b.w,h:lay.anim.dy+lay.anim.s}));
+    for(let y=23;y<=190;y+=4) for(let x=5;x<=292;x+=4){ if(r.some(q=>x>q[0]&&x<q[2]&&y>q[1]&&y<q[3])) continue; if((x<20||x>277)&&(y<22||y>186)) continue; out.push([x,y]); }
+    const step=Math.max(1,Math.floor(out.length/70)); return out.filter((_,i)=>i%step===0); }
+  for(const L of Object.values(LAYOUTS)) L.paper=paperOf(L);
+  const L={W:297,H:210,marks:MARKS}; // the page itself, for finding it
   const INSET=2, DETECT_EDGE=1000, WORK_EDGE=2200, PX_MM=6;
 
   /* ---- finding the page ---- */
@@ -49,7 +68,7 @@ const Template=(()=>{
     for(let i=0;i<8;i++){ let p=i; for(let r=i+1;r<8;r++) if(Math.abs(A[r][i])>Math.abs(A[p][i])) p=r; [A[i],A[p]]=[A[p],A[i]]; const f=A[i][i]; if(!f) return null; for(let c=i;c<9;c++) A[i][c]/=f; for(let r=0;r<8;r++) if(r!==i){ const m=A[r][i]; if(m) for(let c=i;c<9;c++) A[r][c]-=m*A[i][c]; } }
     return [A[0][8],A[1][8],A[2][8],A[3][8],A[4][8],A[5][8],A[6][8],A[7][8],1];
   }
-  function lightField(src,sw,sh,H){ // fit a smooth curved surface per colour channel to the paper samples
+  function lightField(src,sw,sh,H,PAPER){ // fit a smooth curved surface per colour channel to the paper samples
     const pts=[]; for(const [x,y] of PAPER){ const c=warp(src,sw,sh,H,{x:x-1.5,y:y-1.5,w:3,h:3},4,null),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,ch=[[],[],[]]; for(let q=0;q<d.length;q+=4) for(let k=0;k<3;k++) ch[k].push(d[q+k]); pts.push([x/297,y/210,...ch.map(a=>{ a.sort((m,n)=>m-n); return a[Math.floor(a.length*.75)]; })]); }
     const basis=(u,v)=>[1,u,v,u*u,u*v,v*v],coef=[];
     for(let k=0;k<3;k++){ const A=Array.from({length:6},()=>new Array(7).fill(0)); for(const p of pts){ const b=basis(p[0],p[1]); for(let i=0;i<6;i++){ for(let j=0;j<6;j++) A[i][j]+=b[i]*b[j]; A[i][6]+=b[i]*p[2+k]; } }
@@ -79,21 +98,28 @@ const Template=(()=>{
   async function processCanvas(cv,name){
     const f=detect(cv); if(!f) return {name,error:"Couldn't find the four corner squares"};
     const sw=cv.width,sh=cv.height,src=cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,sw,sh).data,H=homography(L.marks,f.pts); if(!H) return {name,error:'The page is too skewed'};
-    const light=lightField(src,sw,sh,H),P=250;
-    const tick=(x,y,s=L.tickSize)=>{ const c=warp(src,sw,sh,H,{x:x+1.1,y:y+1.1,w:s-2.2,h:s-2.2},8,light); return inked(c,P)>.16; };
-    const pickOne=(list,col)=>{ const i=list.findIndex((_,n)=>tick(L.cols[col],L.rowY(n))); return i<0?null:list[i][0]; };
-    const bgC=warp(src,sw,sh,H,inset(L.bg),10,light),scriptC=warp(src,sw,sh,H,inset(L.script),9,light);
-    const sheet={name,amb:pickOne(AMB,0),mus:pickOne(MUS,1),chars:[],
-      bg:inked(bgC,P)>.004?bgC:null,script:inked(scriptC,P)>.003?scriptC:null};
-    for(const b of L.chars){
+    // Which page is it? Read the code squares before evening out the light (the light needs to know where the boxes are).
+    let code=''; for(let i=0;i<4;i++){ const c=warp(src,sw,sh,H,{x:CODE.x+i*CODE.p+.8,y:CODE.y+.8,w:CODE.s-1.6,h:CODE.s-1.6},10,null); code+=inked(c,f.paper)>.5?'1':'0'; }
+    const which=CODES[code]; if(!which) return {name,error:"Couldn't read the page code at the bottom"};
+    const lay=LAYOUTS[which],light=lightField(src,sw,sh,H,lay.paper),P=250;
+    const tick=b=>{ const c=warp(src,sw,sh,H,{x:b.x+1.1,y:b.y+1.1,w:b.s-2.2,h:b.s-2.2},8,light); return inked(c,P)>.16; };
+    const pickOne=(boxes,names)=>{ const i=boxes.findIndex(tick); return i<0?null:names[i][0]; };
+    const sheet={name,kind:lay.kind,layout:which,stage:lay.stage||null,chars:[]};
+    if(lay.bg){ const c=warp(src,sw,sh,H,inset(lay.bg),10,light); sheet.bg=inked(c,P)>.004?c:null; }
+    if(lay.script){ const c=warp(src,sw,sh,H,inset(lay.script),9,light); sheet.script=inked(c,P)>.003?c:null; }
+    if(lay.amb){ sheet.amb=pickOne(lay.amb,AMB); sheet.mus=pickOne(lay.mus,MUS); }
+    if(lay.who) sheet.who=lay.who.map((b,i)=>tick(b)?i:-1).filter(i=>i>=0);
+    if(lay.part){ const k=lay.part.findIndex(tick); sheet.part=k<0?null:k+1; }
+    for(const [n,b] of (lay.chars||[]).entries()){
       // Look a little past the box, in case the drawing goes over its edge.
       const pm=PX_MM*1.4,M=8,big={x:Math.max(3,b.x-M),y:Math.max(3,b.y-M),w:0,h:0}; big.w=Math.min(294,b.x+b.w+M)-big.x; big.h=Math.min(207,b.y+b.h+M)-big.y;
       const c=warp(src,sw,sh,H,big,pm,light),ib=inset(b),rect=[ib.x-big.x,ib.y-big.y,ib.x+ib.w-big.x,ib.y+ib.h-big.y].map(v=>Math.round(v*pm));
       unprint(c,(b.x-big.x)*pm,(b.y-big.y)*pm,b.w*pm,b.h*pm,pm);
       const tol=1.2,outer=[b.x-tol-big.x,b.y-tol-big.y,b.x+b.w+tol-big.x,b.y+b.h+tol-big.y].map(v=>Math.round(v*pm)),cut=await Cut.autoCut(c,rect,outer); if(!cut) continue;
       let raw=c,r2=rect; if(!cut.outside){ raw=document.createElement('canvas'); const bx=[b.x-big.x,b.y-big.y].map(v=>Math.round(v*pm)); raw.width=Math.round(b.w*pm); raw.height=Math.round(b.h*pm); raw.getContext('2d').drawImage(c,-bx[0],-bx[1]); r2=[rect[0]-bx[0],rect[1]-bx[1],rect[2]-bx[0],rect[3]-bx[1]]; }
-      const k=L.animDx.findIndex(dx=>tick(b.x+dx,b.y+L.animDy,L.animSize)); cut.src=c; sheet.chars.push({raw,rect:r2,cut,over:cut.outside,anim:k<0?null:ANIM[k][0]}); }
-    if(!sheet.bg&&!sheet.script&&!sheet.chars.length) sheet.error='This sheet looks blank';
+      const k=lay.anim.dx.findIndex(dx=>tick({x:b.x+dx,y:b.y+lay.anim.dy,s:lay.anim.s})); cut.src=c; sheet.chars.push({n,raw,rect:r2,cut,over:cut.outside,anim:k<0?null:ANIM[k][0]}); }
+    if(sheet.kind==='cast'&&!sheet.chars.length) sheet.error='No characters found on this cast page';
+    else if(sheet.kind!=='cast'&&!sheet.bg&&!sheet.script&&!sheet.chars.length) sheet.error='This sheet looks blank';
     return sheet;
   }
   const toWork=(img,w,h)=>{ const k=Math.min(1,WORK_EDGE/Math.max(w,h)),c=document.createElement('canvas'); c.width=Math.round(w*k); c.height=Math.round(h*k); c.getContext('2d',{willReadFrequently:true}).drawImage(img,0,0,c.width,c.height); return c; };
@@ -116,22 +142,26 @@ const Template=(()=>{
     busy=false; window.__tplLast={sheets:done,ms:performance.now()-t0}; count();
   }
   const usable=()=>sheets.filter(s=>!s.error);
-  function count(){ const n=usable().length,bad=sheets.length-n; $('tplStatus').textContent=sheets.length?`${n} sheet${n===1?'':'s'} ready`+(bad?`, ${bad} need${bad===1?'s':''} another try`:''):''; $('tplAdd').disabled=!n||busy; $('tplAdd').textContent=n?`✓ Add ${n} scene${n===1?'':'s'}`:'✓ Add scenes'; $('tplEmpty').hidden=!!sheets.length; }
+  function count(){ const u=usable(),n=u.length,bad=sheets.length-n,sc=u.filter(s=>s.kind!=='cast').length,casts=u.length-sc;
+    $('tplStatus').textContent=sheets.length?`${n} sheet${n===1?'':'s'} ready`+(bad?`, ${bad} need${bad===1?'s':''} another try`:''):''; $('tplAdd').disabled=!n||busy;
+    $('tplAdd').textContent=sc?`✓ Add ${sc} scene${sc===1?'':'s'}`:casts?'✓ Add the characters':'✓ Add scenes'; $('tplEmpty').hidden=!!sheets.length; }
+  const stageName=k=>(STAGES.find(s=>s[0]===k)||[])[1]||'';
   function canvasThumb(c,cls){ const im=new Image(); im.src=c.toDataURL('image/jpeg',.7); im.alt=''; im.className=cls||''; return im; }
   const labelOf=(list,r)=>(list.find(x=>x[0]===r)||[])[1];
   function renderRow(s){
     const row=document.createElement('div'); row.className='tplRow'+(s.error?' bad':''); s.row=row;
-    const head=document.createElement('div'); head.className='tplHead'; const b=document.createElement('b'); b.textContent=s.error?s.error:s.name; head.append(b);
+    const head=document.createElement('div'); head.className='tplHead'; const b=document.createElement('b'); b.textContent=s.error?s.error:(s.kind==='cast'?'🎭 Cast page':s.kind==='stage'?'📖 '+stageName(s.stage)+(s.part?' '+s.part:''):'🎬 Scene sheet')+' · '+s.name; head.append(b);
     const del=document.createElement('button'); del.className='small'; del.textContent='✕'; del.setAttribute('aria-label','Remove this sheet'); del.onclick=()=>{ sheets=sheets.filter(x=>x!==s); row.remove(); count(); }; head.append(del); row.append(head);
-    if(s.error){ const p=document.createElement('p'); p.className='hint'; p.textContent=s.name+'. Make sure all four corner squares are in the picture, then try again.'; row.append(p); $('tplRows').append(row); return; }
+    if(s.error){ const p=document.createElement('p'); p.className='hint'; p.textContent=s.name+'. Make sure all four corner squares and the page code at the bottom are in the picture, then try again.'; row.append(p); $('tplRows').append(row); return; }
     const w=document.createElement('div'); w.className='tplThumbs';
     const fig=(cap,el)=>{ const f=document.createElement('figure'); f.append(el); const c=document.createElement('figcaption'); c.textContent=cap; f.append(c); w.append(f); return f; };
-    if(s.bg) fig('Backdrop',canvasThumb(s.bg)); else { const e=document.createElement('div'); e.className='tplNone'; e.textContent='none'; fig('Backdrop',e); }
+    if(s.kind!=='cast'){ if(s.bg) fig('Backdrop',canvasThumb(s.bg)); else { const e=document.createElement('div'); e.className='tplNone'; e.textContent='none'; fig('Backdrop',e); } }
     s.chars.forEach((ch,i)=>{ const btn=document.createElement('button'); btn.className='thumb'; btn.title='Tap to fix this cutout'; btn.setAttribute('aria-label','Fix character '+(i+1)); const im=new Image(); im.alt=''; im.src=URL.createObjectURL(ch.cut.blob); btn.append(im);
-      btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); },ch.rect); const cap=(ch.anim?ANIM.find(a=>a[0]===ch.anim)[1]:'Still')+(ch.over?' · past the box':''); const f=fig(cap,btn); if(ch.over){ f.classList.add('over'); btn.title='This drawing went past its box. Tap to check it.'; } });
-    if(s.script) fig('Script',canvasThumb(s.script,'wideimg'));
+      btn.onclick=()=>Cut.edit(ch.raw,cut=>{ ch.cut=cut; im.src=URL.createObjectURL(cut.blob); },ch.rect); const cap=(s.kind==='cast'?(ch.n+1)+' · ':'')+(ch.anim?ANIM.find(a=>a[0]===ch.anim)[1]:'Still')+(ch.over?' · past the box':''); const f=fig(cap,btn); if(ch.over){ f.classList.add('over'); btn.title='This drawing went past its box. Tap to check it.'; } });
+    if(s.script) fig(s.kind==='stage'?'What happens':'Script',canvasThumb(s.script,'wideimg'));
     row.append(w);
-    const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background sound: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a);
+    const a=document.createElement('p'); a.className='hint'; const parts=[]; if(s.amb) parts.push('Background sound: '+labelOf(AMB,s.amb)); if(s.mus) parts.push('Music: '+labelOf(MUS,s.mus)); if(s.kind==='stage') parts.unshift(s.who.length?'Who: '+s.who.map(i=>i+1).join(', '):'Who: no one ticked, so everyone');
+    if(s.kind!=='cast'||parts.length) { a.textContent=parts.join(' · ')||'No sounds ticked'; row.append(a); }
     $('tplRows').append(row);
   }
   /* A thin green box round the edge of the sheet, drawn over the camera picture. */
@@ -158,5 +188,5 @@ const Template=(()=>{
     const d=$('tplDlg'); d.addEventListener('dragover',e=>e.preventDefault()); d.addEventListener('drop',e=>{ e.preventDefault(); const f=[...e.dataTransfer.files]; if(f.length) addFiles(f); });
     d.addEventListener('keydown',e=>{ if(e.code==='Space'&&stream&&!$('capDlg').open&&e.target.tagName!=='BUTTON'){ e.preventDefault(); snap(); } });
   }
-  return {init,open,L,AMB,MUS,ANIM,detect,processCanvas};
+  return {init,open,L,LAYOUTS,AMB,MUS,ANIM,STAGES,detect,processCanvas};
 })();

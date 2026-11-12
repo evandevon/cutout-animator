@@ -222,3 +222,6 @@ dialog.full[open]{display:flex;flex-direction:column;gap:.5rem}
 #expQual label:has(input:checked){border-color:var(--accent);background:#e6f4f1}
 #expQual small{color:var(--muted);display:block}
 #expQual .mb{margin-left:auto;font-weight:800;white-space:nowrap}
+
+/* story stage label on a scene in the strip */
+.scene .stg{position:absolute;left:3px;bottom:3px;max-width:62%;padding:0 .3rem;border-radius:.3rem;background:#2a2320d9;color:#fff;font-size:.68rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}

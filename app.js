@@ -540,6 +540,7 @@ async function previewLib(path,btn){ const same=libPv&&libPv.btn===btn; stopLibP
 function drawThumb(c,s){ const g=c.getContext('2d'); g.setTransform(c.width/W,0,0,c.height/H,0,0); drawScene(g,s,it=>it); }
 function renderScenes(){ if(sd) return; /* don't rebuild the strip under a finger that's dragging it */ const box=$('sceneList'),keep=box.scrollLeft; box.innerHTML=''; project.scenes.forEach((s,i)=>{ const on=s.id===(playing?playing.scene.id:curId),b=document.createElement('button'); b.className='scene'+(on?' on':''); b.dataset.id=s.id; b.title='Hold and drag to move'; b.setAttribute('aria-label','Scene '+(i+1)+(s.take?', recorded':'')+'. Shift and arrow keys move it.');
     const c=document.createElement('canvas'); c.width=186;c.height=105; drawThumb(c,s); b.append(c); const n=document.createElement('span'); n.className='num'; n.textContent=i+1; b.append(n);
+    if(s.stage&&STAGE_NAMES[s.stage]){ const g=document.createElement('span'); g.className='stg'; g.textContent=s.stage==='next'?'Next':STAGE_NAMES[s.stage]; b.append(g); b.setAttribute('aria-label',b.getAttribute('aria-label')+' '+STAGE_NAMES[s.stage]+'.'); }
     if(s.take){ const t=document.createElement('span'); t.className='tick'; const cl=clipOf(s); t.textContent=(cl.len<s.take.dur-.01?'✂ ':'')+fmt(cl.len); b.append(t); }
     if(on&&mode==='setup'){ const x=document.createElement('span'); x.className='trash'; x.textContent='🗑'; x.setAttribute('role','button'); x.setAttribute('aria-label','Delete scene '+(i+1)); x.onpointerdown=e=>e.stopPropagation(); x.onclick=e=>{ e.stopPropagation(); deleteScene(); }; b.append(x); }
     b.onclick=()=>{ if(mode!=='setup'||sceneDragged) return; const was=curId; curId=s.id; selId=null; refreshAll(); if(was!==s.id&&project.scenes.length>1) dragTip(); };
@@ -718,16 +719,31 @@ function sfxWire(){ const cv=$('sfxWave'); let drag=null; const tAt=e=>{ const r
   $('sfxA').oninput=e=>sfxSet('a',e.target.value/1000*sfxDur()); $('sfxB').oninput=e=>sfxSet('b',e.target.value/1000*sfxDur()); $('sfxA').onchange=$('sfxB').onchange=sfxPlay; }
 
 /* ---------- template sheets ---------- */
+/* Scanned sheets become scenes. A scene sheet is one scene. Story pages come as a cast page (6 characters, drawn once)
+   followed by its stage pages, which are put in story order: Orientation, Complication, What happens next 1, 2, 3…, Resolution.
+   Each stage page places the characters ticked under "Who is in this scene?" (everyone if none are ticked). */
+const STAGE_ORDER=['orientation','complication','next','resolution'],STAGE_NAMES={orientation:'Orientation',complication:'Complication',next:'What happens next',resolution:'Resolution'};
 async function importSheets(sheets){ checkpoint();
   const blank=project.scenes.length===1&&!project.scenes[0].items.length&&!project.scenes[0].take, added=[], base=blank?0:project.scenes.length;
   const jpg=c=>new Promise(r=>c.toBlob(r,'image/jpeg',.88));
-  for(const sh of sheets){ const n=blankScene(base+added.length+1);
+  const cutoutOf=async ch=>{ const a=addAsset('cutout',ch.cut.blob,'Cutout',ch.cut.w,ch.cut.h); await keepSource(a,ch.cut); await loadImg(a); project.cast.push(a.id); return a; };
+  const place=(n,list)=>{ const count=list.length; list.forEach(({a,anim},i)=>{ const k=Math.min(320/a.h,Math.min(300,W*.9/count)/a.w,1.6); n.items.push({id:uid(),assetId:a.id,x:W*(i+1)/(count+1),y:H*.6,s:k,r:0,flip:false,anim:anim||null}); }); };
+  const sceneFrom=async sh=>{ const n=blankScene(base+added.length+1);
     if(sh.bg){ const a=addAsset('backdrop',await jpg(sh.bg),'Sheet '+(base+added.length+1),sh.bg.width,sh.bg.height); await loadImg(a); project.backdrops.push(a.id); n.backdrop={type:'asset',id:a.id}; }
-    if(sh.script){ const a=addAsset('script',await jpg(sh.script),'Script',sh.script.width,sh.script.height); n.script=a.id; }
-    n.ambience=sh.amb; n.music=sh.mus;
-    const count=sh.chars.length; for(let i=0;i<count;i++){ const ch=sh.chars[i],a=addAsset('cutout',ch.cut.blob,'Cutout',ch.cut.w,ch.cut.h); await keepSource(a,ch.cut); await loadImg(a); project.cast.push(a.id); const k=Math.min(320/a.h,300/a.w,1.6); n.items.push({id:uid(),assetId:a.id,x:W*(i+1)/(count+1),y:H*.6,s:k,r:0,flip:false,anim:ch.anim||null}); }
-    added.push(n); }
-  project.scenes=blank?added:project.scenes.concat(added); curId=added[0].id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast(sheets.length+(sheets.length===1?' scene':' scenes')+' added.'); }
+    if(sh.script){ const a=addAsset('script',await jpg(sh.script),sh.kind==='stage'?'What happens':'Script',sh.script.width,sh.script.height); n.script=a.id; }
+    if(sh.amb) n.ambience=sh.amb; if(sh.mus) n.music=sh.mus; if(sh.stage) n.stage=sh.stage; return n; };
+  // group story pages under the cast page before them
+  const groups=[]; let story=null;
+  sheets.forEach((sh,i)=>{ sh.__i=i; if(sh.kind==='cast'){ story={cast:sh,pages:[]}; groups.push(story); } else if(sh.kind==='stage'){ if(!story){ story={cast:null,pages:[]}; groups.push(story); } story.pages.push(sh); } else groups.push({single:sh}); });
+  let noCast=0;
+  for(const g of groups){
+    if(g.single){ const sh=g.single,n=await sceneFrom(sh),list=[]; for(const ch of sh.chars) list.push({a:await cutoutOf(ch),anim:ch.anim}); place(n,list); added.push(n); continue; }
+    const cast=[]; if(g.cast) for(const ch of g.cast.chars) cast[ch.n]={a:await cutoutOf(ch),anim:ch.anim}; else noCast++;
+    const key=sh=>STAGE_ORDER.indexOf(sh.stage)*1000+(sh.stage==='next'?(sh.part||9)*100:0)+sh.__i;
+    for(const sh of g.pages.slice().sort((x,y)=>key(x)-key(y))){ const n=await sceneFrom(sh),who=sh.who&&sh.who.length?sh.who:cast.map((_,i)=>i); place(n,who.map(i=>cast[i]).filter(Boolean)); added.push(n); } }
+  if(!added.length){ refreshAll(); dirty(); toast('Characters added to the Cutouts list.'); return; }
+  project.scenes=blank?added:project.scenes.concat(added); curId=added[0].id; selId=null; refreshAll(); showCurrentScene(); dirty();
+  toast(added.length+(added.length===1?' scene':' scenes')+' added.'+(noCast?' Some story pages had no cast page before them, so they have no characters.':''),noCast?6000:undefined); }
 
 /* ---------- wiring ---------- */
 function wire(){

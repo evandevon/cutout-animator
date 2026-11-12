@@ -207,7 +207,7 @@
     <div id="tplView"><video id="tplVideo" playsinline muted autoplay></video><canvas id="tplOver" aria-hidden="true"></canvas></div>
     <div class="tplCamSide"><p id="tplCamMsg" aria-live="polite"></p><button id="tplSnap" class="big">📸 Capture</button><button id="tplCamNext" hidden>🔄 Switch camera</button></div>
   </div>
-  <p id="tplEmpty" class="hint">Each sheet becomes one scene. You can select lots of files at once, or use a PDF with one sheet per page.</p>
+  <p id="tplEmpty" class="hint">Each scene sheet becomes one scene. For a story, scan the cast page first, then its scene pages: they go in story order with the same characters in each. You can select lots of files at once, or use a PDF with one sheet per page.</p>
   <div id="tplRows"></div>
   <div class="dlgBtns"><button id="tplAdd" class="primary big" disabled>✓ Add scenes</button></div>
 </dialog>
@@ -272,7 +272,8 @@
     <button id="openBtn">📂 Open a project file</button>
     <button id="helpBtn">❓ How it works</button>
     <button id="tplBtn">🗂 Add filled-in templates</button>
-    <a class="btn" href="templates/cutout-template-A4.pdf" download>🖨 Print a template</a>
+    <a class="btn" href="templates/cutout-template-A4.pdf" download>🖨 Print a scene template</a>
+    <a class="btn" href="templates/story-template-A4.pdf" download>📖 Print a story template</a>
     <h3>Settings</h3>
     <label class="check"><input type="checkbox" id="libToggle"> 🔊 Show the sound effect library</label>
     <label class="check"><input type="checkbox" id="bigUI"> 🔍 Big buttons, for the class board</label>
@@ -304,6 +305,7 @@
   </ol>
   <h3>Templates for a whole class</h3>
   <p>In the ☰ menu, print a template. Students draw a backdrop and characters, write a script, tick a background sound and music, and note the sounds they'll make. Then choose <b>Add filled-in templates</b> and pick the scanned JPGs or PDFs, or use a webcam. Each sheet becomes one scene, and the script shows on screen during recording.</p>
+  <p>The <b>story template</b> plans a whole story: a cast page with six characters, then Orientation, Complication, What happens next (print as many as you need) and Resolution pages. Each page has a backdrop, a short summary of what happens, sound and music, and ticks for who is in the scene. Scan the cast page first, then its pages in any order: they become scenes in story order, with the same characters and the summary on screen while recording.</p>
   <h3>Paper edge</h3>
   <p>Tap a cutout and press <b>✂️ Paper edge</b> to give it a rough white border, as if it was cut out of paper with scissors. It shows in the video too. Press it again to take it off.</p>
   <h3>Pinned cutouts</h3>

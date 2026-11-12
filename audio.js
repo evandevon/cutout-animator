@@ -4,7 +4,7 @@
 const Sound = (() => {
   const SR = 32000;
   const AMBIENCE = { rain:'Rain', wind:'Wind', ocean:'Ocean waves', underwater:'Underwater', forest:'Forest birds', night:'Night crickets', fire:'Campfire' };
-  const MUSIC = { happy:'Happy', adventure:'Adventure', spooky:'Spooky', sleepy:'Sleepy', silly:'Silly' };
+  const MUSIC = { happy:'Happy', adventure:'Adventure', spooky:'Spooky', sleepy:'Sleepy', silly:'Silly', sad:'Sad', tense:'Tense' };
 
   function rng(seed){ let s=seed>>>0; return ()=>{ s=(s+0x6D2B79F5)>>>0; let t=s; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
   function noiseLoop(len, fill, xf=SR){ // fills len+xf samples, then cross-fades the tail over the head so it loops
@@ -56,6 +56,10 @@ const Sound = (() => {
     spooky:{bpm:64,chords:[[50,53,57],[49,52,56],[50,53,58],[46,50,53]],lead:[2,-1,-1,1,-1,0,-1,-1],kind:'xylo',pad:true},
     sleepy:{bpm:66,chords:[[60,64,67],[57,60,64],[53,57,60],[55,59,62]],lead:[0,1,2,1,0,1,2,1],kind:'xylo',pad:true},
     silly:{bpm:132,chords:[[60,64,67],[60,64,67],[65,69,72],[67,71,74]],lead:[2,-1,1,0,2,2,-1,0],kind:'xylo',bass:[0,2,0,2,0,2,0,2]},
+    // slow minor chords (Am F C E) with a falling tune
+    sad:{bpm:70,chords:[[57,60,64],[53,57,60],[48,52,55],[52,56,59]],lead:[2,-1,1,-1,0,-1,-1,-1],kind:'pluck',pad:true},
+    // a pulsing low note on every beat under creeping chords, like something is about to happen
+    tense:{bpm:104,chords:[[52,55,59],[52,55,60],[52,55,59],[51,54,58]],lead:[0,-1,-1,0,-1,1,-1,-1],kind:'pluck',pad:true,bass:[0,0,0,0]},
   };
   function music(id){
     const s=SONGS[id], beatS=60/s.bpm, bars=8, L=Math.round(bars*4*beatS*SR), a=new Float32Array(L);

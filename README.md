@@ -27,10 +27,10 @@ Work also autosaves on the device and is offered back next time the page opens.
 
 ## Templates for a whole class
 
-1. Print the [template](templates/cutout-template-A4.pdf). It's A4, so print it at A3 size if you want more room to draw. Each sheet has a backdrop box, four character boxes with movement ticks, a script area, background sound and music ticks, and a space to write down the sound effects to record.
+1. Print the [scene template](templates/cutout-template-A4.pdf) (one sheet = one scene) or the [story template](templates/story-template-A4.pdf). They're A4, so print them at A3 size if you want more room to draw. A scene sheet has a backdrop box, four character boxes with movement ticks, a script area, and ticks for one of seven background sounds and seven music styles. The story template has a cast page with six characters, then an Orientation, Complication, What happens next and Resolution page, each with a backdrop, a short summary of what happens, sound and music ticks, and "Who is in this scene?" ticks. Print as many What happens next pages as the story needs, and tick 1, 2, 3… on them.
 2. Students fill them in. Dark pens and bright colours work best.
-3. Scan the sheets, then in the ☰ menu choose **Add filled-in templates**. Select JPGs or PDFs with one sheet per page, or use the webcam. Sheets can be crooked or upside down, as long as all four corner squares show.
-4. Check the results, tap a cutout to fix it, and press **Add scenes**. Each sheet becomes one scene. The handwritten script shows on screen during recording.
+3. Scan the sheets, then in the ☰ menu choose **Add filled-in templates**. Select JPGs or PDFs with one sheet per page, or use the webcam. Sheets can be crooked or upside down, as long as all four corner squares and the page code at the bottom show. For stories, scan each cast page first, then its scene pages, in any order: the app puts them in story order. Several stories can go in one pile, one after another.
+4. Check the results, tap a cutout to fix it, and press **Add scenes**. Each scene sheet or story page becomes one scene, with the same characters throughout a story. The handwritten script or summary shows on screen during recording. Older printouts (without the page code) still work.
 
 To change the sheet, edit `tools/make_templates.py` and the matching numbers at the top of `template.js`.
 
