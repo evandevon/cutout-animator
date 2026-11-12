@@ -92,7 +92,7 @@ const Template=(()=>{
       unprint(c,(b.x-big.x)*pm,(b.y-big.y)*pm,b.w*pm,b.h*pm,pm);
       const tol=1.2,outer=[b.x-tol-big.x,b.y-tol-big.y,b.x+b.w+tol-big.x,b.y+b.h+tol-big.y].map(v=>Math.round(v*pm)),cut=await Cut.autoCut(c,rect,outer); if(!cut) continue;
       let raw=c,r2=rect; if(!cut.outside){ raw=document.createElement('canvas'); const bx=[b.x-big.x,b.y-big.y].map(v=>Math.round(v*pm)); raw.width=Math.round(b.w*pm); raw.height=Math.round(b.h*pm); raw.getContext('2d').drawImage(c,-bx[0],-bx[1]); r2=[rect[0]-bx[0],rect[1]-bx[1],rect[2]-bx[0],rect[3]-bx[1]]; }
-      const k=L.animDx.findIndex(dx=>tick(b.x+dx,b.y+L.animDy,L.animSize)); sheet.chars.push({raw,rect:r2,cut,over:cut.outside,anim:k<0?null:ANIM[k][0]}); }
+      const k=L.animDx.findIndex(dx=>tick(b.x+dx,b.y+L.animDy,L.animSize)); cut.src=c; sheet.chars.push({raw,rect:r2,cut,over:cut.outside,anim:k<0?null:ANIM[k][0]}); }
     if(!sheet.bg&&!sheet.script&&!sheet.chars.length) sheet.error='This sheet looks blank';
     return sheet;
   }

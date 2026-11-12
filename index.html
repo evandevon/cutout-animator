@@ -86,6 +86,20 @@
       </div>
       <div id="teachHint" hidden>Drag it the way it should move. Bring it back to the start, then let go.</div>
       <div id="countdown" hidden aria-live="assertive"></div>
+      <div id="trimBar" hidden>
+        <button id="trimPlay" aria-label="Pause" title="Pause or play (Space)">❚❚</button>
+        <div id="trimMain">
+          <div id="trimTrack" title="Tap to jump to a moment. Drag the yellow ends to cut the start or end off the video.">
+            <div id="trimKeep"></div>
+            <div id="trimHead"></div>
+            <button class="trimGrip" id="trimIn" aria-label="Video starts here. Use the arrow keys to move it."><span>◀</span></button>
+            <button class="trimGrip" id="trimOut" aria-label="Video ends here. Use the arrow keys to move it."><span>▶</span></button>
+          </div>
+          <div id="trimInfo" aria-live="polite"></div>
+        </div>
+        <label id="trimVolWrap" title="Make quiet voices louder">🎤<span class="lab2"> Voice</span>
+          <input type="range" id="trimVol" min="0.5" max="4" step="0.25" value="1" aria-label="Voice volume"><b id="trimVolVal">×1</b></label>
+      </div>
       <div id="itemBar" hidden>
         <span class="animSet" role="group" aria-label="Animation">
           <button data-anim="sway" aria-pressed="false" aria-label="Sway" title="Sway: moves a little, like someone standing">🙂<span class="lab2"> Sway</span></button>
@@ -235,8 +249,7 @@
       <label class="check"><input type="radio" name="expKind" value="all" checked> One video of the whole story</label>
       <label class="check"><input type="radio" name="expKind" value="each"> A separate video for each scene</label>
     </fieldset>
-    <label class="stack">Size
-      <select id="expSize"><option value="1280">720p (HD, smaller file)</option><option value="1920" selected>1080p (Full HD)</option></select></label>
+    <fieldset id="expQualWrap"><legend>Quality</legend><div id="expQual"></div></fieldset>
     <div class="dlgBtns"><button id="expCancel">Cancel</button><button id="expGo" class="primary">Make video</button></div>
   </div>
   <div id="expRun" hidden>
@@ -278,16 +291,16 @@
   <h2>How it works</h2>
   <p>Cutout Animator lives at <a href="https://evandevon.github.io/cutout-animator/" target="_blank" rel="noopener">evandevon.github.io/cutout-animator</a>. Open it in a browser on any computer, tablet or phone.</p>
   <ol>
-    <li><b>Add a drawing.</b> Photograph it on white paper and the paper is cut away. Draw around it or use the brushes to tidy it up.</li>
+    <li><b>Add a drawing.</b> Photograph it on white paper and the paper is cut away. Draw around it or use the brushes to tidy it up. To fix a cutout later, tap ✏️ on it in the Cutouts list.</li>
     <li><b>Or use the library.</b> In the Cutouts tab, choose ready-made people, animals, buildings, vehicles and more.</li>
     <li><b>Set the scene.</b> Choose a backdrop, background sound and music, then place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Park cutouts in the dark "off stage" areas at the sides so they can walk on later. Those areas aren't in the video.</li>
     <li><b>Press Record.</b> Tell the story and drag your cutouts at the same time. Several people can drag different cutouts on a touch screen.</li>
     <li><b>Teach a move.</b> Tap a cutout, press Teach a move, then drag it and let go. It repeats that move for the whole recording. If you grab it, it follows you, then glides back to where you grabbed it and carries on.</li>
     <li><b>Sound effects.</b> In the Sounds tab, record your own sounds first. Tick the ones you want on each scene and they become big buttons under the stage. Tap them while recording, or press their number keys, so one person can do sounds while another moves the cutouts. Teachers can turn on a ready-made sound library in the ☰ menu.</li>
     <li><b>More scenes.</b> ＋ Blank makes a new empty scene. <b>⧉ Copy scene</b> makes a copy of the selected scene, straight after it. Tap 🗑 on the selected scene to delete it. Hold and drag a scene to move it.</li>
-    <li><b>▶ Preview</b> shows the scene with its sounds. What you recorded plays once, and animations, taught moves, background sound and music keep going until you press Stop. When it says "🎬 Video ends here", the rest is not in the video. <b>▶▶ Play all</b> plays the story the way the video will.</li>
+    <li><b>▶ Preview</b> shows the scene with its sounds. What you recorded plays once, and animations, taught moves, background sound and music keep going until you press Stop. The timeline underneath shows the recording: tap it to jump, and drag the yellow ends to cut a slow start or a messy ending off the video. Turn up 🎤 Voice if a voice is too quiet. Space pauses. When it says "🎬 Video ends here", the rest is not in the video. <b>▶▶ Play all</b> plays the story the way the video will.</li>
     <li><b>Add more.</b> Plays the scene back so you can move another cutout or add more voice. This is how to move several cutouts with a mouse.</li>
-    <li><b>Make video</b> makes one video of the whole story, or a separate video for each scene. <b>Save project</b> keeps a file you can open later and keep editing.</li>
+    <li><b>Make video</b> makes one video of the whole story, or a separate video for each scene. Small is best for sharing and email; Standard and Best are sharper on a big screen. The size shown is a rough guide. <b>Save project</b> keeps a file you can open later and keep editing.</li>
   </ol>
   <h3>Templates for a whole class</h3>
   <p>In the ☰ menu, print a template. Students draw a backdrop and characters, write a script, tick a background sound and music, and note the sounds they'll make. Then choose <b>Add filled-in templates</b> and pick the scanned JPGs or PDFs, or use a webcam. Each sheet becomes one scene, and the script shows on screen during recording.</p>
@@ -298,7 +311,7 @@
   <h3>Sticking cutouts together</h3>
   <p>Tap a cutout, press <b>🔗 Stick to…</b>, then tap what it should stick to, like a hat onto a head or a rider onto a horse. The main one gets a yellow 🔗 circle in its middle: drag that circle to move it with everything stuck to it. Dragging anywhere else moves just that one cutout. If the main one turns, grows or hops, the stuck ones go with it. While recording, pinned cutouts can't be grabbed at all, but a pinned cutout still goes along when the cutout it's stuck to is moved by its 🔗 circle. Press 🔗 again to unstick.</p>
   <h3>Moving cutouts</h3>
-  <p>Drag to move, with a finger or the mouse. Pinch with two fingers, or use the round handle or mouse wheel, to resize and turn. Hold Shift with the wheel to turn. Double-tap to flip.</p>
+  <p>Drag to move, with a finger or the mouse. Pinch with two fingers, or drag the round handle just off the top corner, or use the mouse wheel, to resize and turn. Taps go through the see-through gaps in a cutout to whatever is behind it. Hold Shift with the wheel to turn. Double-tap to flip.</p>
   <h3>Keyboard</h3>
   <p>Tab chooses a cutout. Arrows move it, <kbd>[</kbd> <kbd>]</kbd> resize, <kbd>,</kbd> <kbd>.</kbd> turn, <kbd>F</kbd> flips, <kbd>R</kbd> records, <kbd>Esc</kbd> stops.</p>
   <div class="dlgBtns"><button id="helpClose" class="primary">Got it</button></div>

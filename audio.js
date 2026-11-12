@@ -101,24 +101,33 @@ const Sound = (() => {
     cache.set(ref,b); return b;
   }
 
-  /* Used by both live playback and the offline mix-down, so what you hear is what exports. */
+  /* Used by both live playback and the offline mix-down, so what you hear is what exports.
+     o.from: start this far into the scene (for trimming and the preview timeline). o.dur: how long to play;
+     everything, voices and effects included, stops there, so a trimmed scene doesn't spill into the next.
+     The voice goes through its own bus: take.vol boosts quiet voices, with a compressor so loud bits don't distort. */
   function schedule(c,dest,scene,at,buffers,mix,o){
-    const nodes=[], play=(buf,when,vol,loop,dur)=>{
+    const nodes=[],from=Math.max(0,o.from||0),dur=o.dur,end=isFinite(dur)?at+dur:Infinity;
+    const vb=c.createGain(),vc=c.createDynamicsCompressor(); vc.knee.value=10; vc.attack.value=.004; vc.release.value=.25; vb.connect(vc); vc.connect(dest);
+    const setVoice=v=>{ v=Math.max(0,isFinite(+v)?+v:1); const n=c.currentTime||0; vb.gain.setValueAtTime(mix.voice*v,n);
+      vc.threshold.setValueAtTime(v>1?-10-6*Math.log2(v):0,n); vc.ratio.setValueAtTime(v>1?4:1,n); };
+    setVoice(scene.take?.vol??1);
+    const play=(buf,t,vol,loop,out)=>{
       if(!buf) return; const s=c.createBufferSource(); s.buffer=buf; s.loop=!!loop;
-      const g=c.createGain(); s.connect(g); g.connect(dest); s.start(when);
-      if(loop){ g.gain.setValueAtTime(0,when); g.gain.linearRampToValueAtTime(vol,when+.25);
-        if(isFinite(dur)){ g.gain.setValueAtTime(vol,Math.max(when+.25,when+dur-.25)); g.gain.linearRampToValueAtTime(0,when+dur); s.stop(when+dur); } }
-      else g.gain.value=vol;
+      const g=c.createGain(); s.connect(g); g.connect(out||dest);
+      if(loop){ s.start(at,from%buf.duration); g.gain.setValueAtTime(0,at); g.gain.linearRampToValueAtTime(vol,at+.25);
+        if(isFinite(dur)){ g.gain.setValueAtTime(vol,Math.max(at+.25,end-.25)); g.gain.linearRampToValueAtTime(0,end); s.stop(end); } }
+      else { const rel=t-from; if(rel>=dur) return; if(rel>=0) s.start(at+rel); else { if(-rel>=buf.duration) return; s.start(at,-rel); }
+        g.gain.value=vol; if(isFinite(dur)){ g.gain.setValueAtTime(vol,Math.max(at,end-.03)); g.gain.linearRampToValueAtTime(0,end); s.stop(end+.01); } }
       nodes.push({s,g});
     };
-    const dur=o.dur;
-    play(buffers(scene.ambience),at,mix.ambience,true,dur);
-    play(buffers(scene.music),at,mix.music,true,dur);
+    play(buffers(scene.ambience),0,mix.ambience,true);
+    play(buffers(scene.music),0,mix.music,true);
     if(o.withTake&&scene.take){
-      for(const v of scene.take.voices||[]) play(buffers('asset:'+v.assetId),at+v.t,mix.voice,false);
-      for(const f of scene.take.fx||[]) play(buffers(f.ref),at+f.t,mix.fx,false);
+      for(const v of scene.take.voices||[]) play(buffers('asset:'+v.assetId),v.t,1,false,vb);
+      for(const f of scene.take.fx||[]) play(buffers(f.ref),f.t,mix.fx,false);
     }
-    return ()=>{ const n=c.currentTime; for(const {s,g} of nodes){ try{ g.gain.cancelScheduledValues(n); g.gain.setTargetAtTime(0,n,.04); s.stop(n+.2); }catch(_){} } };
+    const stop=()=>{ const n=c.currentTime; for(const {s,g} of nodes){ try{ g.gain.cancelScheduledValues(n); g.gain.setTargetAtTime(0,n,.04); s.stop(n+.2); }catch(_){} } };
+    stop.setVoice=setVoice; return stop;
   }
   // A gentle limiter on the final mix, so voice + music + effects don't distort.
   function master(c){ if(!c.__master){ const m=c.createDynamicsCompressor(); m.threshold.value=-8; m.knee.value=8; m.ratio.value=12; m.attack.value=.003; m.release.value=.2; m.connect(c.destination); c.__master=m; } return c.__master; }

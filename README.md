@@ -11,16 +11,17 @@ It runs entirely in the browser. Photos and recordings stay on the device: nothi
 ## Using it
 
 1. Go to <https://evandevon.github.io/cutout-animator/>.
-2. **Add a drawing.** Take a photo, choose a picture or paste one. White paper is removed automatically. Tidy up with Draw around, Erase, Add and Tap to remove.
+2. **Add a drawing.** Take a photo, choose a picture or paste one. White paper is removed automatically. Tidy up with Draw around, Erase, Add and Tap to remove. Tap ✏️ on a cutout in the list to fix it later: the photo it came from is kept, so Add can bring back anything that was cut off.
 3. **Or use the library.** Choose ready-made people, animals, buildings, vehicles and more from the Cutouts tab.
 4. **Set the scene.** Choose a backdrop, background sound and music, and place your cutouts. Tap a cutout and pick an animation at the top of the stage: sway, hop, float or spin. Tap it again to stop. Press **📌 Pinned** for things that are part of the place, like trees and houses: a pinned cutout stays put while recording, and taps go through it to the cutouts behind. Library buildings, trees and rocks start pinned. Press **🔗 Stick to…** and tap another cutout to stick them together, like a hat onto a head. Drag the yellow 🔗 circle in the middle of the main one to move them together; dragging anywhere else moves just that cutout. Park cutouts in the dark "off stage" areas at the sides so they can walk on later.
 5. **Check the microphone.** The meter beside the Record button shows your volume, and the dropdown chooses a microphone if there's more than one.
 6. **Record.** Your voice, the chosen sounds and every movement are recorded. Drag with a finger or the mouse. On a touch screen, several fingers can move different cutouts at once, and pinching resizes and turns a cutout.
 7. **Teach a move (optional).** Tap a cutout, press Teach a move, drag it and let go. It repeats that move during recording. Grab it and it follows you, then glides back to where you grabbed it and carries on.
 8. **Sound effects (optional).** In the Sounds tab, record your own sounds first. Tick the ones you want on each scene and they become big buttons under the stage: tap one while recording, or press its number key. On a touch screen, one person can tap sounds while another moves the cutouts and a third does the voice. A ready-made sound library can be switched on in the ☰ menu.
-9. **Add more.** Plays the scene back so you can move another cutout or add more voice.
-10. Use **＋ Blank** for a new empty scene, or **Continue story** for a new scene that starts where the selected one finishes. Hold and drag a scene to move it, and tap 🗑 on the selected scene to delete it.
-11. **Make video** makes one video of the whole story, or a separate video for each scene. **Save** downloads a `.cutz` project file that can be reopened and edited from the ☰ menu.
+9. **Preview and trim.** ▶ Preview shows a timeline of the recording. Tap it to jump, drag the yellow ends to cut a slow start or a messy ending off the video, and turn up 🎤 Voice to boost a quiet voice. Space pauses.
+10. **Add more.** Plays the scene back so you can move another cutout or add more voice.
+11. Use **＋ Blank** for a new empty scene, or **Continue story** for a new scene that starts where the selected one finishes. Hold and drag a scene to move it, and tap 🗑 on the selected scene to delete it.
+12. **Make video** makes one video of the whole story, or a separate video for each scene. Choose Small (720p, for sharing), Standard (1080p) or Best (1080p, 30 frames a second); each shows a rough file size. **Save** downloads a `.cutz` project file that can be reopened and edited from the ☰ menu.
 
 Work also autosaves on the device and is offered back next time the page opens.
 

@@ -67,10 +67,15 @@ const Cut = (() => {
       ok.push(hit); }
     const out=new Uint8Array(w*h); for(let i=0;i<w*h;i++) if(keep[i]&&ok[lab[i]]) out[i]=1; return out;
   }
-  let editRect=null;
+  let editRect=null,initFix=null,scaleK=1;
+  /* Fixing a cutout that's already in the project: start from its current shape (not a fresh automatic cut),
+     placed over the photo it came from, so Add can bring back what was cut off. */
+  function initMask(){ const f=initFix; if(f.m) return f.m; const c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d',{willReadFrequently:true}),b=f.box.map(v=>v*scaleK);
+    g.drawImage(f.mask,b[0],b[1],b[2],b[3]); const d=g.getImageData(0,0,W,H).data,m=new Uint8Array(W*H); for(let i=0;i<W*H;i++) m[i]=d[i*4+3]>110?1:0; return f.m=m; }
   function recompute(){
     whiteGain=1;
-    if(hasAlpha){ auto=new Uint8Array(W*H); for(let i=0;i<W*H;i++) auto[i]=pix[i*4+3]>128?1:0; }
+    if(initFix){ auto=initMask(); whiteGain=initFix.gain||1; }
+    else if(hasAlpha){ auto=new Uint8Array(W*H); for(let i=0;i<W*H;i++) auto[i]=pix[i*4+3]>128?1:0; }
     else if($('autoPaper').checked){ auto=autoMask(pix,W,H,+$('thresh').value,$('keepHoles').checked); if(editRect) auto=inRect(auto,W,H,editRect); }
     else auto=new Uint8Array(W*H).fill(1);
     $('threshWrap').style.opacity=$('holesWrap').style.opacity=$('autoPaper').checked?1:.4;
@@ -127,7 +132,7 @@ const Cut = (() => {
   cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
 
   function setImage(source,sw,sh){
-    const k=Math.min(1,MAX_EDGE/Math.max(sw,sh)); W=Math.max(2,Math.round(sw*k)); H=Math.max(2,Math.round(sh*k)); if(editRect&&k<1) editRect=editRect.map(v=>Math.round(v*k));
+    const k=Math.min(1,MAX_EDGE/Math.max(sw,sh)); scaleK=k; W=Math.max(2,Math.round(sw*k)); H=Math.max(2,Math.round(sh*k)); if(editRect&&k<1) editRect=editRect.map(v=>Math.round(v*k));
     src=document.createElement('canvas'); src.width=W; src.height=H;
     const g=src.getContext('2d',{willReadFrequently:true}); g.drawImage(source,0,0,W,H);
     pix=g.getImageData(0,0,W,H).data;
@@ -149,7 +154,7 @@ const Cut = (() => {
     const c=document.createElement('canvas'); c.width=rot?H:W; c.height=rot?W:H; const g=c.getContext('2d',{willReadFrequently:true}); fn(g,c); g.drawImage(src,0,0);
     const ne=new Int8Array(c.width*c.height), oW=W,oH=H;
     for(let y=0;y<oH;y++)for(let x=0;x<oW;x++){ const v=edit[y*oW+x]; if(!v) continue; const nx=rot?oH-1-y:oW-1-x, ny=rot?x:y; ne[ny*c.width+nx]=v; }
-    src=c; W=c.width; H=c.height; pix=g.getImageData(0,0,W,H).data; edit=ne; undo=[]; recompute();
+    src=c; W=c.width; H=c.height; pix=g.getImageData(0,0,W,H).data; edit=ne; undo=[]; initFix=null; recompute();
   }
 
   /* Bulk path for template sheets: no editor, default settings. */
@@ -161,10 +166,10 @@ const Cut = (() => {
     const O=outer||R,outside=!!rect&&(x0<O[0]||y0<O[1]||x1>=O[2]||y1>=O[3]);
     const cw=x1-x0+1,ch=y1-y0+1,c=document.createElement('canvas'); c.width=cw;c.height=ch; const x=c.getContext('2d'),d=x.createImageData(cw,ch);
     for(let yy=0;yy<ch;yy++)for(let xx=0;xx<cw;xx++){ const i=(yy+y0)*w+xx+x0; if(!keep[i]) continue; const q=i*4,o=(yy*cw+xx)*4; let s=0,t=0; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ const X=xx+x0+dx,Y=yy+y0+dy; if(X>=0&&Y>=0&&X<w&&Y<h){ s+=keep[Y*w+X]; t++; } } d.data[o]=ink(p[q]);d.data[o+1]=ink(p[q+1]);d.data[o+2]=ink(p[q+2]);d.data[o+3]=Math.round(255*Math.min(1,s/t*1.25)); }
-    x.putImageData(d,0,0); const blob=await new Promise(r=>c.toBlob(r,'image/png')); return {blob,w:cw,h:ch,outside};
+    x.putImageData(d,0,0); const blob=await new Promise(r=>c.toBlob(r,'image/png')); return {blob,w:cw,h:ch,outside,box:[x0,y0,cw,ch],gain:g};
   }
   let fixDone=null;
-  function editBox(canvas,done,rect){ fixDone=done; editRect=rect||null; mode='cutout'; $('capTitle').textContent='Fix this cutout'; $('capDlg').showModal(); setImage(canvas,canvas.width,canvas.height); $('cutBackdrop').hidden=$('cutAnother').hidden=$('cutRetake').hidden=true; $('cutDone').textContent='✓ Use this cutout'; }
+  function editBox(canvas,done,rect,init){ fixDone=done; editRect=rect||null; initFix=init||null; mode='cutout'; $('capTitle').textContent='Fix this cutout'; $('capDlg').showModal(); setImage(canvas,canvas.width,canvas.height); $('cutBackdrop').hidden=$('cutAnother').hidden=$('cutRetake').hidden=true; $('cutDone').textContent='✓ Use this cutout'; }
 
   async function finish(another){
     let x0=W,y0=H,x1=-1,y1=-1; const k=new Uint8Array(W*H);
@@ -174,13 +179,16 @@ const Cut = (() => {
     for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){ const i=(y+y0)*W+x+x0,q=i*4,o=(y*cw+x)*4; if(!k[i]){ // transparent, but keep edge colour to avoid dark halos when scaled
           continue; }
       let s=0,n=0; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ const xx=x+x0+dx,yy=y+y0+dy; if(xx>=0&&yy>=0&&xx<W&&yy<H){ s+=k[yy*W+xx]; n++; } }
-      d.data[o]=pix[q]*whiteGain;d.data[o+1]=pix[q+1]*whiteGain;d.data[o+2]=pix[q+2]*whiteGain;d.data[o+3]=Math.round(255*Math.min(1,(s/n)*1.25)); }
+      d.data[o]=pix[q]*whiteGain;d.data[o+1]=pix[q+1]*whiteGain;d.data[o+2]=pix[q+2]*whiteGain;d.data[o+3]=Math.round(255*Math.min(1,(s/n)*1.25)*(hasAlpha?pix[q+3]/255:1)); }
     g.putImageData(d,0,0);
     const z=Math.min(1,OUT_EDGE/Math.max(cw,ch)); let out=c;
     if(z<1){ out=document.createElement('canvas'); out.width=Math.round(cw*z); out.height=Math.round(ch*z); const o=out.getContext('2d'); o.imageSmoothingQuality='high'; o.drawImage(c,0,0,out.width,out.height); }
     const blob=await new Promise(r=>out.toBlob(r,'image/png'));
-    if(fixDone){ const f=fixDone; f({blob,w:out.width,h:out.height}); close(); return; }
-    await onCutout(blob,out.width,out.height);
+    const box=[x0,y0,cw,ch];
+    if(fixDone){ const f=fixDone; f({blob,w:out.width,h:out.height,box,k:scaleK,src,gain:whiteGain,png:hasAlpha}); close(); return; }
+    // Keep the part of the photo around the cutout, so it can be fixed later (Add needs the original picture).
+    const m=Math.round(Math.max(cw,ch)*.15)+24,sx=Math.max(0,x0-m),sy=Math.max(0,y0-m),sc=document.createElement('canvas'); sc.width=Math.min(W,x1+1+m)-sx; sc.height=Math.min(H,y1+1+m)-sy; sc.getContext('2d').drawImage(src,-sx,-sy);
+    await onCutout(blob,out.width,out.height,{src:sc,box:[x0-sx,y0-sy,cw,ch],gain:whiteGain,png:hasAlpha});
     if(another){
       // Blank out what was just taken, so the next cut is whatever else is on the page.
       pushUndo(); for(let i=0;i<W*H;i++) if(k[i]) edit[i]=-1; draw();
@@ -208,7 +216,7 @@ const Cut = (() => {
   function stopCam(){ if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('camVideo').srcObject=null; }
   function showSource(){ src=null; $('capCut').hidden=true; $('capSource').hidden=false; startCam(); }
   function open(m){ mode=m; $('capTitle').textContent=m==='backdrop'?'Add a backdrop':'Add a drawing'; $('capDlg').showModal(); showSource(); }
-  function close(){ stopCam(); src=null; fixDone=null; editRect=null; $('cutBackdrop').hidden=$('cutRetake').hidden=false; $('cutDone').textContent='✓ Add to stage'; $('capDlg').close(); }
+  function close(){ stopCam(); src=null; fixDone=null; editRect=null; initFix=null; $('cutBackdrop').hidden=$('cutRetake').hidden=false; $('cutDone').textContent='✓ Add to stage'; $('capDlg').close(); }
 
   function init(o){
     ({onCutout,onBackdrop,toast}=o);
@@ -219,8 +227,8 @@ const Cut = (() => {
     $('imgInput').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) fromBlob(f); };
     $('pasteImg').onclick=async()=>{ try{ for(const it of await navigator.clipboard.read()){ const t=it.types.find(x=>x.startsWith('image/')); if(t){ fromBlob(await it.getType(t)); return; } } toast('No picture on the clipboard.'); }catch(_){ toast('Press Ctrl+V (or Cmd+V) to paste instead.'); } };
     window.addEventListener('paste',e=>{ if(!$('capDlg').open) return; for(const it of e.clipboardData.items) if(it.type.startsWith('image/')){ fromBlob(it.getAsFile()); e.preventDefault(); return; } });
-    let t; const deb=()=>{ clearTimeout(t); t=setTimeout(recompute,60); };
-    $('thresh').oninput=deb; $('autoPaper').onchange=recompute; $('keepHoles').onchange=recompute;
+    let t; const reauto=()=>{ initFix=null; recompute(); },deb=()=>{ clearTimeout(t); t=setTimeout(reauto,60); };
+    $('thresh').oninput=deb; $('autoPaper').onchange=reauto; $('keepHoles').onchange=reauto;
     document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ tool=b.dataset.tool; document.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); });
     $('cutUndo').onclick=()=>{ if(undo.length){ edit=undo.pop(); draw(); } };
     $('cutReset').onclick=()=>{ pushUndo(); edit.fill(0); draw(); };
