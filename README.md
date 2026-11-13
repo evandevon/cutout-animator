@@ -25,6 +25,12 @@ It runs entirely in the browser. Photos and recordings stay on the device: nothi
 
 Work also autosaves on the device and is offered back next time the page opens.
 
+## Weather, shadows and wobble
+
+- **Weather:** the buttons under the stage add rain, snow, bubbles, leaves, sparkles or petals in front of everything. Tap one before recording to start the scene with it, or tap during recording to start and stop it as part of the performance. Each drop and leaf is a little hand-cut shape that moves in small stop-motion steps.
+- **Shadows:** every cutout has a soft drop shadow, as if held just in front of the backdrop (smaller for pinned cutouts). Turn it off for a project in the ☰ menu.
+- **Wobble:** when a cutout starts, stops or changes direction quickly, it tips and squashes a little, then settles, like a paper puppet on a stick. Hop squashes a little as it lands. The wobble comes from the recorded movement, so Preview and the video match the performance.
+
 ## Templates for a whole class
 
 1. Print the [scene template](templates/cutout-template-A4.pdf) (one sheet = one scene) or the [story template](templates/story-template-A4.pdf). They're A4, so print them at A3 size if you want more room to draw. A scene sheet has a backdrop box, four character boxes with movement ticks, a script area, and ticks for one of seven background sounds and seven music styles. The story template has a cast page with six characters, then an Orientation, Complication, What happens next and Resolution page, each with a backdrop, a short summary of what happens, sound and music ticks, and "Who is in this scene?" ticks. Print as many What happens next pages as the story needs, and tick 1, 2, 3… on them.

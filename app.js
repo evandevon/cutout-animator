@@ -33,9 +33,9 @@ function ask(title,msg,buttons,input){ return new Promise(res=>{ $('askTitle').t
   $('askDlg').oncancel=()=>res(null); $('askDlg').showModal(); if(input!==undefined) inp.focus(); }); }
 
 /* ---------- undo & autosave ---------- */
-const snap=()=>JSON.stringify({scenes:project.scenes,cast:project.cast,backdrops:project.backdrops,pads:project.pads,mix:project.mix});
+const snap=()=>JSON.stringify({scenes:project.scenes,cast:project.cast,backdrops:project.backdrops,pads:project.pads,mix:project.mix,shadows:project.shadows!==false});
 function checkpoint(){ undoStack.push(snap()); if(undoStack.length>40) undoStack.shift(); redoStack=[]; undoBtns(); }
-function restoreSnap(s){ Object.assign(project,JSON.parse(s)); if(!project.scenes.find(x=>x.id===curId)) curId=project.scenes[0].id; selId=null; refreshAll(); dirty(); }
+function restoreSnap(s){ Object.assign(project,JSON.parse(s)); if(project.shadows===true) delete project.shadows; if(!project.scenes.find(x=>x.id===curId)) curId=project.scenes[0].id; selId=null; refreshAll(); dirty(); }
 function undo(){ if(mode!=='setup'||!undoStack.length) return; redoStack.push(snap()); restoreSnap(undoStack.pop()); undoBtns(); }
 function redo(){ if(mode!=='setup'||!redoStack.length) return; undoStack.push(snap()); restoreSnap(redoStack.pop()); undoBtns(); }
 function undoBtns(){ $('undoBtn').disabled=!undoStack.length; $('redoBtn').disabled=!redoStack.length; document.querySelector('.railUndo').disabled=!undoStack.length; document.querySelector('.railRedo').disabled=!redoStack.length; }
@@ -94,7 +94,7 @@ function drawBackdrop(c,b){
 function animAt(it,h,t){ let n=0; for(const ch of it.id) n=(n*31+ch.charCodeAt(0))%9973; const f=n/9973*6.283,a=clamp(h/300,.4,1.6),none={x:0,y:0,r:0,s:1};
   switch(it.anim){
     case 'sway': return {x:0,y:0,r:.028*Math.sin(.61*t+f)+.009*Math.sin(1.47*t+4*f),s:1,sy:1+.016*Math.sin(1.7*t+2*f),feet:true}; // rocks and breathes from the feet, which barely move
-    case 'hop': return {x:0,y:-a*34*Math.abs(Math.sin(2.8*t+f)),r:.04*Math.sin(2.8*t+f),s:1};
+    case 'hop': { const S=Math.sin(2.8*t+f),q=.08*Math.max(0,1-Math.abs(S)/.22); return {x:0,y:-a*34*Math.abs(S),r:.04*S,s:1,sx:1+q*.6,sy:1-q,feet:true}; } // squashes a little as it lands
     case 'float': return {x:a*7*Math.sin(.6*t+f),y:a*14*Math.sin(1.15*t+f),r:.06*Math.sin(.9*t+2*f),s:1};
     case 'spin': return {x:0,y:0,r:1.5*t,s:1};
     default: return none; } }
@@ -109,12 +109,32 @@ const mlin=(m,x,y)=>[m[0]*x+m[2]*y,m[1]*x+m[3]*y];
 const mdet=m=>m[0]*m[3]-m[1]*m[2];
 function mdecomp(m){ const s=Math.hypot(m[2],m[3]),r=Math.atan2(-m[2],m[3]); return {x:m[4],y:m[5],s,r,flip:(m[0]*Math.cos(r)+m[1]*Math.sin(r))<0}; }
 const ANIM0={x:0,y:0,r:0,s:1};
-function localMat(it,p,im,t){ const h0=im?im.naturalHeight:0,fl=p.flip?-1:1,v=t==null?ANIM0:animAt(it,h0*p.s,t);
-  if(v.feet) return [mT(p.x,p.y),mR(p.r+(p.tilt||0)),mS(fl*p.s,p.s),mT(0,h0/2),mR(v.r),mS(1,v.sy),mT(0,-h0/2)].reduce(mmul);
-  return [mT(p.x+v.x,p.y+v.y),mR(p.r+(p.tilt||0)+v.r),mS(fl*p.s*v.s,p.s*v.s)].reduce(mmul); }
-function sceneMats(scene,poseOf,t,anim=true){ const by=new Map(scene.items.map(i=>[i.id,i])),out=new Map();
+function localMat(it,p,im,t,w){ const h0=im?im.naturalHeight:0,fl=p.flip?-1:1,v=t==null?ANIM0:animAt(it,h0*p.s,t);
+  let m=v.feet?[mT(p.x+v.x,p.y+v.y),mR(p.r+(p.tilt||0)),mS(fl*p.s,p.s),mT(0,h0/2),mR(v.r),mS(v.sx||1,v.sy||1),mT(0,-h0/2)].reduce(mmul)
+              :[mT(p.x+v.x,p.y+v.y),mR(p.r+(p.tilt||0)+v.r),mS(fl*p.s*v.s,p.s*v.s)].reduce(mmul);
+  if(w&&(w.r||w.q)) m=[m,mT(0,h0/2),mR(w.r*fl),mS(1+w.q*.6,1-w.q),mT(0,-h0/2)].reduce(mmul); // paper wobble and squash, from the feet
+  return m; }
+/* Paper wobble: when a cutout stops, starts or changes direction quickly it tips and squashes a little, then settles,
+   like a paper puppet on a stick. It's worked out from where the cutout was over the last moment (at(t) gives [x, y]),
+   so a recording plays back and exports with exactly the same wobble. Gentle moves don't wobble at all. */
+const WOB={w:2*Math.PI*2.6,z:.24,win:.9,h:1/60,dead:4000,gr:.005,gq:.0034};
+function wobbleSim(at,t){ const {w,z,win,h,dead,gr,gq}=WOB,n=Math.round(win/h),dz=a=>Math.abs(a)<dead?0:Math.sign(a)*(Math.abs(a)-dead);
+  let P=at(t-win-h),Q=at(t-win); if(!P||!Q) return null; let vx=(Q[0]-P[0])/h,vy=(Q[1]-P[1])/h,r=0,rv=0,q=0,qv=0,moved=false; P=Q;
+  for(let k=n-1;k>=0;k--){ const R=at(t-k*h); if(!R) continue; const sx=(R[0]-P[0])/h,sy=(R[1]-P[1])/h,e=Math.min(1,h/.05),nx=vx+(sx-vx)*e,ny=vy+(sy-vy)*e,ax=dz((nx-vx)/h),ay=dz((ny-vy)/h); vx=nx; vy=ny; P=R;
+    if(ax||ay) moved=true; rv+=(-w*w*r-2*z*w*rv-gr*ax)*h; r+=rv*h; qv+=(-w*w*q-2*z*w*qv+gq*(-ay+.35*Math.abs(ax)))*h; q+=qv*h; }
+  if(!moved&&Math.abs(r)<.002&&Math.abs(q)<.002) return null; return {r:clamp(r,-.13,.13),q:clamp(q,-.06,.09)}; }
+const wobbleOff=()=>window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* For a recording: wobble for each cutout at scene time t, from its recorded path. */
+const takeWobble=(poseFn,t)=>wobbleOff()?null:it=>it.link||it.fixed?null:wobbleSim(tt=>{ const q=poseFn(it,tt); return [q.x,q.y]; },t);
+/* While setting up and recording: from where the cutouts have actually been, kept for about a second. */
+const wobHist=new Map();
+function liveWobble(scene){ if(wobbleOff()) return null; const now=performance.now()/1000;
+  for(const it of scene.items){ if(it.link) continue; const p=poseNow(it); let hs=wobHist.get(it.id); if(!hs) wobHist.set(it.id,hs=[]); hs.push([now,p.x,p.y]); while(hs.length>2&&hs[1][0]<now-1.2) hs.shift(); }
+  const at=hs=>tt=>{ if(tt<=hs[0][0]) return [hs[0][1],hs[0][2]]; for(let i=hs.length-1;i>0;i--){ const A=hs[i-1],B=hs[i]; if(tt>=A[0]){ if(tt>=B[0]) return [B[1],B[2]]; const k=(tt-A[0])/((B[0]-A[0])||1); return [A[1]+(B[1]-A[1])*k,A[2]+(B[2]-A[2])*k]; } } return [hs[0][1],hs[0][2]]; };
+  return it=>{ if(it.link) return null; const hs=wobHist.get(it.id); return hs&&hs.length>1?wobbleSim(at(hs),now):null; }; }
+function sceneMats(scene,poseOf,t,anim=true,wob=null){ const by=new Map(scene.items.map(i=>[i.id,i])),out=new Map();
   const get=(it,depth)=>{ let r=out.get(it.id); if(r) return r; const im=imgs.get(it.assetId),p=poseOf(it),par=it.link&&depth<16?by.get(it.link):null,P=par?get(par,depth+1).m:I6;
-    r={it,p,P,im,m:mmul(P,localMat(it,p,im,anim?t:null))}; out.set(it.id,r); return r; };
+    r={it,p,P,im,m:mmul(P,localMat(it,p,im,anim?t:null,wob&&anim?wob(it):null))}; out.set(it.id,r); return r; };
   for(const it of scene.items) get(it,0); return out; }
 function drawWith(c,e){ if(!e||!e.im) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]);
   const E=e.it&&e.it.edge?paperEdge(e.im):null; if(E) c.drawImage(E.c,-w/2-E.pad,-h/2-E.pad); else c.drawImage(e.im,-w/2,-h/2,w,h); c.restore(); }
@@ -136,8 +156,22 @@ function paperEdge(im){ let E=edges.get(im); if(E) return E; const w=im.naturalW
   oc.putImageData(id,0,0); const c=document.createElement('canvas'); c.width=W2; c.height=H2; const cc=c.getContext('2d');
   cc.save(); cc.shadowColor='rgba(0,0,0,.28)'; cc.shadowBlur=Math.max(2,r*.5); cc.shadowOffsetX=r*.12; cc.shadowOffsetY=r*.22; cc.drawImage(out,0,0); cc.restore();
   cc.drawImage(out,0,0); cc.drawImage(im,pad,pad,w,h); E={c,pad}; edges.set(im,E); return E; }
+/* Drop shadow: a soft shadow just behind each cutout, as if the puppet is held a little in front of the backdrop.
+   The blurred shape is made once per picture; it always falls down and to the right on the stage, whichever way the cutout is turned. */
+const shadowsOn=()=>project.shadows!==false;
+const shades=new WeakMap();
+function shadowOf(im){ let S=shades.get(im); if(S) return S; const w=im.naturalWidth,h=im.naturalHeight; if(!w||!h||!im.complete) return null;
+  const b=clamp(Math.max(w,h)*.018,3,22),pad=Math.ceil(b*2.5),c=document.createElement('canvas'); c.width=w+2*pad; c.height=h+2*pad; const g=c.getContext('2d'),far=c.width+w+50;
+  g.shadowColor='rgba(25,15,5,.38)'; g.shadowBlur=b; g.shadowOffsetX=far; g.drawImage(im,pad-far,pad,w,h); S={c,pad}; shades.set(im,S); return S; }
+function drawShadow(c,e){ if(!e||!e.im||(e.it&&e.it.edge)) return; const S=shadowOf(e.im); if(!S) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight,size=Math.max(w,h)*Math.sqrt(Math.abs(mdet(m))),pin=e.it&&e.it.fixed,d=(5+6*Math.min(1,size/500))*(pin?.5:1);
+  c.save(); c.globalAlpha=pin?.6:1; c.translate(d*.65,d); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); }
 function cornersOf(e){ if(!e||!e.im) return null; const w=e.im.naturalWidth/2,h=e.im.naturalHeight/2,A=(x,y)=>mapp(e.m,x,y); return {tl:A(-w,-h),tr:A(w,-h),br:A(w,h),bl:A(-w,h)}; }
-function drawScene(c,scene,poseOf,t=0,mats){ mats=mats||sceneMats(scene,poseOf,t); c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); drawBackdrop(c,scene.backdrop); for(const it of scene.items) drawWith(c,mats.get(it.id)); c.restore(); }
+function drawScene(c,scene,poseOf,t=0,mats,o={}){ mats=mats||sceneMats(scene,poseOf,t,true,o.wob); c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); drawBackdrop(c,scene.backdrop); const sh=shadowsOn();
+  for(const it of scene.items){ const e=mats.get(it.id); if(sh) drawShadow(c,e); drawWith(c,e); }
+  if(o.wx) Weather.draw(c,scene.wx,o.wx.events,o.wx.t,W,H); c.restore(); }
+/* The weather to draw right now: what the scene starts with, plus the taps made while recording. */
+function weatherNow(scene){ if(mode==='rec'&&rec) return {t:recTime(),events:wxEvents()}; if(mode==='play'&&playing) return {t:playing.t,events:playing.scene.take&&playing.scene.take.wx}; return {t:nowT(),events:null}; }
+const wxEvents=()=>rec?(rec.layer&&rec.scene.take&&rec.scene.take.wx||[]).concat(rec.wx):[];
 const loopOn=it=>!!(it.loop&&it.loop.on);
 function loopPose(it,t){ if(!loopOn(it)) return it; const F=it.loop.frames,D=it.loop.dur,T=((t%D)+D)%D; let a=0,b=F.length-1; while(b-a>1){ const m=(a+b)>>1; if(F[m][0]<=T) a=m; else b=m; } const A=F[a],B=F[b],k=clamp((T-A[0])/((B[0]-A[0])||1),0,1),L=i=>A[i]+(B[i]-A[i])*k;
   return {x:it.x+L(1),y:it.y+L(2),s:it.s*L(3),r:it.r+L(4),flip:it.flip,tilt:0}; }
@@ -167,8 +201,8 @@ function render(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#2d2730'; ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(vs,0,0,vs,MX*vs,MY*vs); ctx.imageSmoothingQuality='high';
   if(mode!=='play'){ ctx.fillStyle='#ffffff38'; ctx.font='800 26px "Nunito",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText('OFF STAGE',-MX/2,-MY+14); ctx.fillText('OFF STAGE',W+MX/2,-MY+14); }
-  const T=nowT(),mats=sceneMats(scene,poseNow,T);
-  drawScene(ctx,scene,poseNow,T,mats);
+  const T=nowT(),wob=mode==='play'&&playing?takeWobble((it,tt)=>playing.preview?previewPose(it,playing.scene.take,tt):poseAt(it,playing.scene.take,tt),playing.t):liveWobble(scene),mats=sceneMats(scene,poseNow,T,true,wob);
+  drawScene(ctx,scene,poseNow,T,mats,{wx:weatherNow(scene)});
   // Off-stage "wings": cutouts stay visible here for the performer, but the video crops them out.
   ctx.save(); ctx.globalAlpha=.55; for(const it of scene.items){ const e=mats.get(it.id),c=cornersOf(e); if(!c) continue; const xs=[c.tl[0],c.tr[0],c.br[0],c.bl[0]],ys=[c.tl[1],c.tr[1],c.br[1],c.bl[1]];
     if(Math.min(...xs)<0||Math.max(...xs)>W||Math.min(...ys)<0||Math.max(...ys)>H){ ctx.save(); ctx.beginPath(); ctx.rect(-MX,-MY,VW,VH); ctx.rect(0,0,W,H); ctx.clip('evenodd'); drawWith(ctx,e); ctx.restore(); } } ctx.restore();
@@ -362,7 +396,7 @@ function beginTake(scene,layer,buf){
   const c=Sound.audioCtx(); live.clear();
   for(const it of scene.items){ const p=layer?poseAt(it,scene.take,0):it; live.set(it.id,{x:p.x,y:p.y,s:p.s,r:p.r,flip:!!p.flip,tilt:p.tilt||0}); }
   const t0=c.currentTime+.04; console.info('Recording started. Sound: '+c.state+', delay to speakers about '+Math.round(((c.outputLatency||0)+(c.baseLatency||0))*1000)+' ms');
-  rec={scene,layer:!!layer,t0,tracks:{},last:{},over:{},loopS:{},fx:[],prevT:0,lastPush:{},vel:{}};
+  rec={scene,layer:!!layer,t0,tracks:{},last:{},over:{},loopS:{},fx:[],wx:[],prevT:0,lastPush:{},vel:{}};
   for(const [id,p] of live) rec.last[id]={...p};
   stopAudio=Sound.schedule(c,Sound.master(c),scene,t0,buf,mixNow(),{dur:Infinity,withTake:!!layer});
   if(micOK&&!Sound.micCollecting()) Sound.micCollect();
@@ -402,8 +436,8 @@ function finishTake(){ Sound.wake(60,true);
   if(rec.layer&&scene.take){
     const old=scene.take, tracks={...old.tracks};
     for(const id of Object.keys(rec.tracks)){ const T=rec.over[id]??0; tracks[id]=(old.tracks[id]||[]).filter(f=>f[0]<T).concat(rec.tracks[id]); }
-    scene.take={dur:Math.max(old.dur,t),tracks,voices:[...(old.voices||[]),...(voice?[voice]:[])],fx:[...(old.fx||[]),...rec.fx].sort((a,b)=>a.t-b.t)};
-  } else scene.take={dur:t,tracks:rec.tracks,voices:voice?[voice]:[],fx:rec.fx};
+    scene.take={dur:Math.max(old.dur,t),tracks,voices:[...(old.voices||[]),...(voice?[voice]:[])],fx:[...(old.fx||[]),...rec.fx].sort((a,b)=>a.t-b.t),wx:[...(old.wx||[]),...rec.wx].sort((a,b)=>a.t-b.t)};
+  } else scene.take={dur:t,tracks:rec.tracks,voices:voice?[voice]:[],fx:rec.fx,wx:rec.wx};
   if(stopAudio){ stopAudio(); stopAudio=null; }
   grabs.clear(); rec=null; live.clear();
 }
@@ -513,9 +547,20 @@ function renderSoundTab(){ const s=cur(); fillSelect($('ambSel'),Sound.AMBIENCE,
   const m=project.mix; $('mixVoice').value=m.voice; $('mixAmb').value=m.ambience; $('mixMus').value=m.music; $('mixFx').value=m.fx; renderPads(); }
 const scenePads=(s=cur())=>(s.pads||[]).filter(r=>project.pads.includes(r));
 function padName(r){ const a=project.assets[r.slice(6)]; return a?a.name:'?'; }
-function renderPads(){ const box=$('padRow'); box.innerHTML=''; renderPadList(); scenePads().forEach((r,i)=>{ const b=document.createElement('button'); b.className='pad'; b.innerHTML=(i<9?`<kbd>${i+1}</kbd> `:'')+(isMine(r)?'🎤 ':'🔊 '); b.append(padName(r)); b.onpointerdown=e=>{ e.preventDefault(); hitPad(r); }; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); hitPad(r); } };
+/* Weather buttons: before recording they set what the scene starts with; while recording, each tap is recorded. */
+function wxOn(k){ const s=cur(); if(mode==='rec'&&rec) return Weather.isOn(s.wx,wxEvents(),recTime(),k); return !!(s.wx&&s.wx.includes(k)); }
+function hitWeather(k,b){ const s=cur();
+  if(mode==='rec'&&rec){ const on=!wxOn(k); rec.wx.push({t:r3(recTime()),k,on}); }
+  else if(mode==='setup'){ checkpoint(); const L=(s.wx||[]).filter(x=>x!==k); if(!(s.wx||[]).includes(k)) L.push(k); if(L.length) s.wx=L; else delete s.wx; dirty(); }
+  else return; const on=wxOn(k); b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }
+function renderPads(){ const box=$('padRow'); box.innerHTML=''; renderPadList();
+  const wg=document.createElement('div'); wg.className='wxRow'; wg.setAttribute('role','group'); wg.setAttribute('aria-label','Weather');
+  for(const {k,icon,name} of Weather.KINDS){ const b=document.createElement('button'),on=wxOn(k); b.className='wx'+(on?' on':''); b.setAttribute('aria-pressed',on); b.title=name+(mode==='rec'?': tap to start or stop it':': tap to start the scene with '+name.toLowerCase()); b.innerHTML=`<span aria-hidden="true">${icon}</span><span class="wxName">${name}</span>`;
+    b.onpointerdown=e=>{ e.preventDefault(); hitWeather(k,b); }; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); hitWeather(k,b); } }; wg.append(b); }
+  box.append(wg);
+  scenePads().forEach((r,i)=>{ const b=document.createElement('button'); b.className='pad'; b.innerHTML=(i<9?`<kbd>${i+1}</kbd> `:'')+(isMine(r)?'🎤 ':'🔊 '); b.append(padName(r)); b.onpointerdown=e=>{ e.preventDefault(); hitPad(r); }; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); hitPad(r); } };
     if(mode==='setup'){ const x=document.createElement('span'); x.className='trash'; x.textContent='🗑'; x.setAttribute('role','button'); x.setAttribute('aria-label','Hide the '+padName(r)+' button on this scene'); x.onpointerdown=e=>{ e.stopPropagation(); e.preventDefault(); }; x.onclick=e=>{ e.stopPropagation(); checkpoint(); cur().pads=(cur().pads||[]).filter(q=>q!==r); renderPads(); dirty(); toast('Hidden on this scene. Tick it in the Sounds tab to bring it back.',2200); }; b.append(x); }
-    box.append(b); }); box.hidden=!scenePads().length||mode==='play'; document.querySelectorAll('#sfxLib input').forEach(c=>{ c.checked=project.pads.includes(refForLib(c.value)); }); resize(); }
+    box.append(b); }); box.hidden=mode==='play'; document.querySelectorAll('#sfxLib input').forEach(c=>{ c.checked=project.pads.includes(refForLib(c.value)); }); resize(); }
 const refForLib=path=>{ const id=Object.keys(project.assets).find(k=>project.assets[k].libPath===path); return id?'asset:'+id:''; };
 const isMine=r=>{ const a=project.assets[r.slice(6)]; return !!(a&&a.mine); };
 function renderPadList(){ const box=$('padList'); if(!box) return; box.innerHTML=''; $('padListHead').hidden=!project.pads.length; const on=cur().pads||[];
@@ -581,7 +626,7 @@ function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cu
 function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
 function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ $('itEdge').classList.toggle('on',!!it.edge); $('itEdge').setAttribute('aria-pressed',!!it.edge); { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); const l=$('itLink'),m=it.link&&cur().items.find(i=>i.id===it.link); l.classList.toggle('on',!!m); l.innerHTML=m?'🔗<span class="lab2"> Unstick</span>':'🔗<span class="lab2"> Stick to…</span>'; l.setAttribute('aria-label',m?'Stuck to '+nameOf(m)+'. Press to unstick':'Stick to another cutout'); l.title=m?'Stuck to '+nameOf(m)+'. Press to unstick.':'Make this follow another cutout'; } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
 function refreshTransport(){ const s=cur(),any=project.scenes.some(x=>x.take); $('playBtn').hidden=false; $('layerBtn').hidden=!s.take; $('playAllBtn').hidden=project.scenes.filter(x=>x.take).length<2; $('recBtn').lastChild.textContent=s.take?' Redo':' Record'; }
-function refreshAll(){ $('projName').value=project.name; renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
+function refreshAll(){ $('projName').value=project.name; $('shadowToggle').checked=shadowsOn(); renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
 
 /* ---------- project files ---------- */
 const extOf=b=>({'image/png':'png','image/jpeg':'jpg','audio/wav':'wav','audio/mpeg':'mp3','audio/mp4':'m4a','audio/ogg':'ogg'}[b.type]||'bin');
@@ -602,7 +647,7 @@ async function adopt(p){ imgs.clear(); hitMaps.clear(); p.assets=cleanAssets(p.a
 
 /* ---------- video export ---------- */
 async function mixAll(scenes,total){ const sr=48000,off=new OfflineAudioContext(2,Math.max(1,Math.ceil(total*sr)),sr); let at=0; for(const s of scenes){ const buf=await preload(s),cl=clipOf(s); Sound.schedule(off,Sound.master(off),s,at,buf,project.mix,{dur:cl.len,withTake:true,from:cl.a}); at+=cl.len; } return off.startRendering(); }
-function frameAt(c,scenes,t,cw){ let a=0; for(const s of scenes){ const cl=clipOf(s); if(t<a+cl.len||s===scenes[scenes.length-1]){ const l=Math.min(t-a,cl.len)+cl.a; c.setTransform(cw/W,0,0,cw/W,0,0); drawScene(c,s,it=>poseAt(it,s.take,l),l); return; } a+=cl.len; } }
+function frameAt(c,scenes,t,cw){ let a=0; for(const s of scenes){ const cl=clipOf(s); if(t<a+cl.len||s===scenes[scenes.length-1]){ const l=Math.min(t-a,cl.len)+cl.a; c.setTransform(cw/W,0,0,cw/W,0,0); drawScene(c,s,it=>poseAt(it,s.take,l),l,null,{wob:takeWobble((it,tt)=>poseAt(it,s.take,tt),l),wx:{t:l,events:s.take.wx}}); return; } a+=cl.len; } }
 /* Timers are throttled in hidden tabs (down to once a minute), so the fast path never waits on one.
    A MessageChannel yield and the encoders' own events keep running at full speed in the background. */
 const yieldNow=()=>new Promise(r=>{ const m=new MessageChannel(); m.port1.onmessage=()=>{ m.port1.close(); r(); }; m.port2.postMessage(0); });
@@ -747,8 +792,9 @@ async function importSheets(sheets){ checkpoint();
 
 /* ---------- wiring ---------- */
 function wire(){
+  $('shadowToggle').onchange=e=>{ checkpoint(); if(e.target.checked) delete project.shadows; else project.shadows=false; dirty(); };
   trimWire();
-  if(/[?&]debug\b/.test(location.search)) window.__ca={get project(){ return project; },get selId(){ return selId; },get grabs(){ return [...grabs.values()]; },cur,W,H,MX,MY,VW,VH}; // for automated tests only
+  if(/[?&]debug\b/.test(location.search)) window.__ca={get project(){ return project; },get selId(){ return selId; },get grabs(){ return [...grabs.values()]; },cur,wobbleSim,W,H,MX,MY,VW,VH}; // for automated tests only
   // A long press on a touch screen counts as a right-click, and the browser's menu ("Save image as…") would cover the stage.
   document.addEventListener('contextmenu',e=>{ if(!e.target.closest('input,textarea,[contenteditable]')) e.preventDefault(); });
   document.addEventListener('dragstart',e=>{ if(e.target.tagName==='IMG'||e.target.tagName==='CANVAS') e.preventDefault(); });

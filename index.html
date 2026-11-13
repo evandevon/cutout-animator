@@ -276,6 +276,7 @@
     <a class="btn" href="templates/story-template-A4.pdf" download>📖 Print a story template</a>
     <h3>Settings</h3>
     <label class="check"><input type="checkbox" id="libToggle"> 🔊 Show the sound effect library</label>
+    <label class="check"><input type="checkbox" id="shadowToggle" checked> 🌑 Soft shadows behind cutouts (this project)</label>
     <label class="check"><input type="checkbox" id="bigUI"> 🔍 Big buttons, for the class board</label>
     <button id="fsBtn">⛶ Full screen</button>
     <h3>Sound check</h3>
@@ -308,6 +309,10 @@
   <p>The <b>story template</b> plans a whole story: a cast page with six characters, then Orientation, Complication, What happens next (print as many as you need) and Resolution pages. Each page has a backdrop, a short summary of what happens, sound and music, and ticks for who is in the scene. Scan the cast page first, then its pages in any order: they become scenes in story order, with the same characters and the summary on screen while recording.</p>
   <h3>Paper edge</h3>
   <p>Tap a cutout and press <b>✂️ Paper edge</b> to give it a rough white border, as if it was cut out of paper with scissors. It shows in the video too. Press it again to take it off.</p>
+  <h3>Weather</h3>
+  <p>The weather buttons under the stage (🌧 Rain, ❄️ Snow, 🫧 Bubbles, 🍂 Leaves, ✨ Sparkles, 🌸 Petals) drift in front of everything. Before recording, tap one to start the scene with it. While recording, tap to start or stop it as part of the performance, and it's in the video just as you performed it. On small screens they appear once recording starts.</p>
+  <h3>Shadows and wobble</h3>
+  <p>Cutouts have a soft shadow behind them, as if they're held just in front of the backdrop. Turn it off for a project in the ☰ menu. When a cutout starts, stops or changes direction quickly, it tips and squashes a little and then settles, like a paper puppet on a stick. Slow, gentle moves don't wobble.</p>
   <h3>Pinned cutouts</h3>
   <p>Tap a cutout and press <b>📌 Pinned</b> for things that are part of the place, like trees and houses. A pinned cutout stays put while recording, and taps go straight through it to the cutouts behind. You can still move it while setting up. Library buildings, trees and rocks start pinned. Tap 📌 again to unpin.</p>
   <h3>Sticking cutouts together</h3>
@@ -327,6 +332,7 @@
 <script src="cut.js"></script>
 <script src="library.js"></script>
 <script src="template.js"></script>
+<script src="weather.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

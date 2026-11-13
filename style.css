@@ -139,7 +139,7 @@ dialog.full[open]{display:flex;flex-direction:column;gap:.5rem}
   #rail button{min-height:38px;padding:.15rem .1rem;flex-direction:column;gap:0;font-size:1.2rem;line-height:1.05}
   .railLab{font-size:.6rem;font-weight:800}
   #rail button.on{background:var(--accent);color:#fff}
-  #stageWrap{grid-area:stage}#top{grid-area:top}#transport{grid-area:trans}#padRow{grid-area:trans}#scriptView{grid-area:script}
+  #stageWrap{grid-area:stage}#top{grid-area:top}#transport{grid-area:trans}#padRow{grid-area:trans}body:not(.live) #padRow{display:none}#scriptView{grid-area:script}
   #scrim:not([hidden]){display:block;position:fixed;inset:0;background:#0005;z-index:19}
   #side,#scenes{display:none!important;position:fixed;z-index:20;background:var(--card);border:2px solid var(--line);border-radius:.8rem;box-shadow:3px 4px 0 #0005;overflow:hidden}
   body[data-drawer=cast] #side,body[data-drawer=back] #side,body[data-drawer=sound] #side{display:flex!important}
@@ -225,3 +225,10 @@ dialog.full[open]{display:flex;flex-direction:column;gap:.5rem}
 
 /* story stage label on a scene in the strip */
 .scene .stg{position:absolute;left:3px;bottom:3px;max-width:62%;padding:0 .3rem;border-radius:.3rem;background:#2a2320d9;color:#fff;font-size:.68rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+
+/* weather buttons, first in the effects row */
+.wxRow{display:flex;gap:.3rem;flex:1 1 100%;flex-wrap:wrap}
+.wx{flex:1 1 4.2rem;min-height:var(--tap);padding:0 .4rem;font-size:1rem;background:#eef4fb;display:flex;align-items:center;justify-content:center;gap:.3rem;touch-action:none}
+.wx .wxName{font-size:.8rem;font-weight:800}
+.wx.on{background:#2f6fa8;color:#fff;border-color:#1d4c76}
+@media (max-width:900px),(max-height:520px){.wx .wxName{display:none}.wx{flex:1 1 2.8rem}}
