@@ -117,12 +117,12 @@ function localMat(it,p,im,t,w){ const h0=im?im.naturalHeight:0,fl=p.flip?-1:1,v=
 /* Paper wobble: when a cutout stops, starts or changes direction quickly it tips and squashes a little, then settles,
    like a paper puppet on a stick. It's worked out from where the cutout was over the last moment (at(t) gives [x, y]),
    so a recording plays back and exports with exactly the same wobble. Gentle moves don't wobble at all. */
-const WOB={w:2*Math.PI*2.6,z:.24,win:.9,h:1/60,dead:4000,gr:.0015,gq:.00102};
+const WOB={w:2*Math.PI*2.6,z:.24,win:.9,h:1/60,dead:4000,gr:.0008,gq:.0005,rMax:.045,qMax:.03};
 function wobbleSim(at,t){ const {w,z,win,h,dead,gr,gq}=WOB,n=Math.round(win/h),dz=a=>Math.abs(a)<dead?0:Math.sign(a)*(Math.abs(a)-dead);
   let P=at(t-win-h),Q=at(t-win); if(!P||!Q) return null; let vx=(Q[0]-P[0])/h,vy=(Q[1]-P[1])/h,r=0,rv=0,q=0,qv=0,moved=false; P=Q;
   for(let k=n-1;k>=0;k--){ const R=at(t-k*h); if(!R) continue; const sx=(R[0]-P[0])/h,sy=(R[1]-P[1])/h,e=Math.min(1,h/.05),nx=vx+(sx-vx)*e,ny=vy+(sy-vy)*e,ax=dz((nx-vx)/h),ay=dz((ny-vy)/h); vx=nx; vy=ny; P=R;
     if(ax||ay) moved=true; rv+=(-w*w*r-2*z*w*rv-gr*ax)*h; r+=rv*h; qv+=(-w*w*q-2*z*w*qv+gq*(-ay+.35*Math.abs(ax)))*h; q+=qv*h; }
-  if(!moved&&Math.abs(r)<.002&&Math.abs(q)<.002) return null; return {r:clamp(r,-.13,.13),q:clamp(q,-.06,.09)}; }
+  if(!moved&&Math.abs(r)<.002&&Math.abs(q)<.002) return null; const {rMax,qMax}=WOB; return {r:rMax*Math.tanh(r/rMax),q:q>0?qMax*Math.tanh(q/qMax):.6*qMax*Math.tanh(q/(.6*qMax))}; } // gently limited: at most about 2.5° of tip and 3% squash
 const wobbleOff=()=>window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* For a recording: wobble for each cutout at scene time t, from its recorded path. */
 const takeWobble=(poseFn,t)=>wobbleOff()?null:it=>it.link||it.fixed?null:wobbleSim(tt=>{ const q=poseFn(it,tt); return [q.x,q.y]; },t);
