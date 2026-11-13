@@ -51,6 +51,8 @@
       <button id="addBackdrop" class="primary wide">📷 Add a backdrop</button>
       <div id="backList" class="grid wideThumbs"></div>
       <label class="row">Plain colour <input type="color" id="backColor" value="#bfe3f5"></label>
+      <button id="shadowScene" class="wide" aria-pressed="false" title="Turn this scene into a shadow puppet show">🎭 Shadow puppets (this scene)</button>
+      <p class="hint">Use the sliders beside the stage: ☀️ on the left for day and night, 🌊 on the right for the sea.</p>
     </section>
     <section class="tab" id="tab-sound" hidden>
       <h3>This scene</h3>
@@ -86,6 +88,8 @@
       </div>
       <div id="teachHint" hidden>Drag it the way it should move. Bring it back to the start, then let go.</div>
       <div id="countdown" hidden aria-live="assertive"></div>
+      <div id="todSlider" class="vSlider" role="slider" tabindex="0" aria-label="Time of day" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" hidden title="Day and night: slide down for sunset and night"><span class="vsEnd">☀️</span><div class="vsTrack day"><span class="vsThumb">◉</span></div><span class="vsEnd">🌙</span></div>
+      <div id="seaSlider" class="vSlider" role="slider" tabindex="0" aria-label="Sea level" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" hidden title="Sea level: slide up to add water. All the way down: no sea"><span class="vsEnd">🌊</span><div class="vsTrack sea"><span class="vsThumb">◉</span></div><span class="vsEnd">⤓</span></div>
       <div id="trimBar" hidden>
         <button id="trimPlay" aria-label="Pause" title="Pause or play (Space)">❚❚</button>
         <div id="trimMain">
@@ -109,6 +113,7 @@
         </span>
         <button id="itLink" aria-label="Stick to another cutout">🔗<span class="lab2"> Stick to…</span></button>
         <button id="itFixed" aria-pressed="false" title="Pinned: it stays put while recording, and taps go through it" aria-label="Pinned">📌<span class="lab2"> Pinned</span></button>
+        <button id="itLight" aria-pressed="false" title="Light: glows and lights up the dark around it (slide ☀️ towards 🌙)" aria-label="Light">💡<span class="lab2"> Light</span></button>
         <button id="itLoop" aria-label="Teach a looping move">🔁<span class="lab2"> Teach a move</span></button>
         <button id="itLoopRedo" aria-label="Teach the move again" title="Teach the move again" hidden>↺<span class="lab2"> Again</span></button>
         <button id="itEdge" aria-pressed="false" aria-label="Paper edge" title="Paper edge: a rough white border, like it was cut out with scissors">✂️<span class="lab2"> Paper edge</span></button>
@@ -274,6 +279,8 @@
     <button id="tplBtn">🗂 Add filled-in templates</button>
     <a class="btn" href="templates/cutout-template-A4.pdf" download>🖨 Print a scene template</a>
     <a class="btn" href="templates/story-template-A4.pdf" download>📖 Print a story template</a>
+    <button id="allShadow">🎭 Make every scene shadow puppets</button>
+    <button id="allColour">🎨 Make every scene colour</button>
     <h3>Settings</h3>
     <label class="check"><input type="checkbox" id="libToggle"> 🔊 Show the sound effect library</label>
     <label class="check"><input type="checkbox" id="shadowToggle" checked> 🌑 Soft shadows behind cutouts (this project)</label>
@@ -311,6 +318,10 @@
   <p>Tap a cutout and press <b>✂️ Paper edge</b> to give it a rough white border, as if it was cut out of paper with scissors. It shows in the video too. Press it again to take it off.</p>
   <h3>Weather</h3>
   <p>The weather buttons under the stage (🌧 Rain, ❄️ Snow, 🫧 Bubbles, 🍂 Leaves, ✨ Sparkles, 🌸 Petals) drift in front of everything. Before recording, tap one to start the scene with it. While recording, tap to start or stop it as part of the performance, and it's in the video just as you performed it. On small screens they appear once recording starts.</p>
+  <h3>Day, night and the sea</h3>
+  <p>While setting up a scene, slide ☀️ on the left of the stage down to move the sun across the sky to sunset, dusk and night. Mark a cutout as 💡 <b>Light</b> (a torch, lantern, candle or street lamp) and it lights up the dark around it; stick it to a character to carry it, or pin it in place. Slide 🌊 on the right up to add water: everything below the line is gently tinted and rippled, so a boat sits in the sea and a fish swims under it. Slide it all the way down for no sea. The dashed blue line only shows while setting up.</p>
+  <h3>Shadow puppets</h3>
+  <p>On the Backdrop tab, 🎭 <b>Shadow puppets</b> turns this scene into a lamp-lit paper screen. The cutouts become shadows, whatever colours they were drawn in, and the backdrop becomes faint scenery. To show details like eyes, cut holes in the cutout with Erase (✏️ on the cutout). New scenes follow the scene you're on, and the ☰ menu can switch every scene at once.</p>
   <h3>Shadows and wobble</h3>
   <p>Cutouts have a soft shadow behind them, as if they're held just in front of the backdrop. Turn it off for a project in the ☰ menu. When a cutout starts, stops or changes direction quickly, it tips and squashes a little and then settles, like a paper puppet on a stick. Slow, gentle moves don't wobble.</p>
   <h3>Pinned cutouts</h3>
@@ -333,6 +344,7 @@
 <script src="library.js"></script>
 <script src="template.js"></script>
 <script src="weather.js"></script>
+<script src="stagefx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

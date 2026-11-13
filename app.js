@@ -166,9 +166,16 @@ function shadowOf(im){ let S=shades.get(im); if(S) return S; const w=im.naturalW
 function drawShadow(c,e){ if(!e||!e.im||(e.it&&e.it.edge)) return; const S=shadowOf(e.im); if(!S) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight,size=Math.max(w,h)*Math.sqrt(Math.abs(mdet(m))),pin=e.it&&e.it.fixed,d=(5+6*Math.min(1,size/500))*(pin?.5:1);
   c.save(); c.globalAlpha=pin?.6:1; c.translate(d*.65,d); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); }
 function cornersOf(e){ if(!e||!e.im) return null; const w=e.im.naturalWidth/2,h=e.im.naturalHeight/2,A=(x,y)=>mapp(e.m,x,y); return {tl:A(-w,-h),tr:A(w,-h),br:A(w,h),bl:A(-w,h)}; }
-function drawScene(c,scene,poseOf,t=0,mats,o={}){ mats=mats||sceneMats(scene,poseOf,t,true,o.wob); c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); drawBackdrop(c,scene.backdrop); const sh=shadowsOn();
-  for(const it of scene.items){ const e=mats.get(it.id); if(sh) drawShadow(c,e); drawWith(c,e); }
-  if(o.wx) Weather.draw(c,scene.wx,o.wx.events,o.wx.t,W,H); c.restore(); }
+function drawScene(c,scene,poseOf,t=0,mats,o={}){ mats=mats||sceneMats(scene,poseOf,t,true,o.wob); c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); const sp=!!scene.shadow;
+  if(sp){ // shadow puppets: a lamp-lit screen, faint scenery, and the cutouts as soft-edged shadows
+    const b=scene.backdrop; StageFX.screen(c,W,H,t,JSON.stringify(b),g=>{ drawBackdrop(g,b); return b.type!=='asset'||!!imgs.get(b.id); });
+    for(const it of scene.items){ const e=mats.get(it.id); if(!e||!e.im) continue; const S=StageFX.silhouette(e.im); if(!S) continue; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); } }
+  else { drawBackdrop(c,scene.backdrop); const sh=shadowsOn(); for(const it of scene.items){ const e=mats.get(it.id); if(sh) drawShadow(c,e); drawWith(c,e); } }
+  StageFX.water(c,W,H,scene.sea,t,sp);
+  if(o.wx) Weather.draw(c,scene.wx,o.wx.events,o.wx.t,W,H,sp);
+  if(!sp&&scene.tod>.01){ const lights=[]; for(const it of scene.items){ if(!it.light) continue; const e=mats.get(it.id); if(!e||!e.im) continue; const [x,y]=mapp(e.m,0,0),sz=Math.max(e.im.naturalWidth,e.im.naturalHeight)*Math.sqrt(Math.abs(mdet(e.m))); lights.push({x,y,R:clamp(sz*1.7,150,460)}); }
+    StageFX.daylight(c,W,H,scene.tod,scene.sea!=null?scene.sea*H:H,lights); }
+  c.restore(); }
 /* The weather to draw right now: what the scene starts with, plus the taps made while recording. */
 function weatherNow(scene){ if(mode==='rec'&&rec) return {t:recTime(),events:wxEvents()}; if(mode==='play'&&playing) return {t:playing.t,events:playing.scene.take&&playing.scene.take.wx}; return {t:nowT(),events:null}; }
 const wxEvents=()=>rec?(rec.layer&&rec.scene.take&&rec.scene.take.wx||[]).concat(rec.wx):[];
@@ -190,12 +197,29 @@ function poseAt(it,take,t){
 
 const cv=$('stage'),ctx=cv.getContext('2d'); let vs=1,dpr=1;
 function resize(){ const wr=$('stageWrap'),cs=getComputedStyle(wr),b={width:wr.clientWidth,height:wr.clientHeight-parseFloat(cs.paddingTop)}; if(!b.width||b.height<=0) return; dpr=Math.min(2.5,devicePixelRatio||1); const k=Math.min(b.width/VW,b.height/VH),cw=Math.floor(VW*k),ch=Math.floor(VH*k);
-  cv.style.width=cw+'px'; cv.style.height=ch+'px'; cv.width=Math.floor(cw*dpr); cv.height=Math.floor(ch*dpr); vs=cv.width/VW; }
+  cv.style.width=cw+'px'; cv.style.height=ch+'px'; cv.width=Math.floor(cw*dpr); cv.height=Math.floor(ch*dpr); vs=cv.width/VW; if($('todSlider').paint) paintSliders(); }
 new ResizeObserver(resize).observe($('stageWrap'));
 function poseNow(it){ if(mode==='rec') return live.get(it.id)||it; if(mode==='play'&&playing) return playing.preview?previewPose(it,playing.scene.take,playing.t):poseAt(it,playing.scene.take,playing.t); return it; } // taught moves only play when playing or recording; setup shows their path instead (drawPaths)
 function nowT(){ const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches; return mode==='rec'&&rec?recTime():playing?playing.t:reduce?0:performance.now()/1000; }
 function matsNow(){ return sceneMats(playing?playing.scene:cur(),poseNow,nowT()); }
 const centreOf=e=>mapp(e.m,0,0);
+/* Two sliders beside the stage, for setting up a scene (not while recording):
+   left ☀️/🌙 moves the sun across the sky and down into night; right 🌊 sets the sea level (all the way down: no sea). */
+function sliderWire(){
+  const mk=(id,get,set,text)=>{ const el=$(id),th=el.querySelector('.vsThumb'),tr=el.querySelector('.vsTrack'); let drag=null;
+    const at=e=>{ const r=tr.getBoundingClientRect(); return clamp((e.clientY-r.top)/r.height,0,1); };
+    el.addEventListener('pointerdown',e=>{ if(mode!=='setup') return; e.preventDefault(); checkpoint(); drag=e.pointerId; el.setPointerCapture(e.pointerId); set(at(e)); paintSliders(); dirty(); });
+    el.addEventListener('pointermove',e=>{ if(drag!==e.pointerId) return; set(at(e)); paintSliders(); });
+    const up=e=>{ if(drag!==e.pointerId) return; drag=null; dirty(); }; el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
+    el.addEventListener('keydown',e=>{ const k={ArrowUp:-.05,ArrowDown:.05,PageUp:-.2,PageDown:.2,Home:-1,End:1}[e.key]; if(k==null||mode!=='setup') return; e.preventDefault(); checkpoint(); set(clamp(get()+k,0,1)); paintSliders(); dirty(); });
+    el.paint=()=>{ const v=get(); th.style.top=(v*100)+'%'; el.setAttribute('aria-valuenow',Math.round(v*100)); el.setAttribute('aria-valuetext',text(v)); }; };
+  mk('todSlider',()=>cur().tod||0,v=>{ const s=cur(); if(v<.01) delete s.tod; else s.tod=Math.round(v*1000)/1000; },
+     v=>v<.05?'Daytime':v<.45?'Afternoon':v<.62?'Sunset':v<.76?'Dusk':'Night');
+  mk('seaSlider',()=>cur().sea??1,v=>{ const s=cur(); if(v>.97) delete s.sea; else s.sea=Math.round(Math.max(.06,v)*1000)/1000; },v=>v>.97?'No sea':'Sea level '+Math.round((1-v)*100)+'% up the stage');
+}
+function paintSliders(){ const on=mode==='setup',s=cur(); for(const id of ['todSlider','seaSlider']){ const el=$(id); el.hidden=!on||(id==='todSlider'&&!!s.shadow); if(!el.hidden&&el.paint) el.paint(); }
+  const r=cv.getBoundingClientRect(),wr=$('stageWrap').getBoundingClientRect(),k=r.width/VW,left=r.left-wr.left+MX*k,top=r.top-wr.top+MY*k,h=H*k;
+  const put=(el,x)=>{ el.style.left=x+'px'; el.style.top=top+'px'; el.style.height=h+'px'; }; put($('todSlider'),left-46); put($('seaSlider'),left+W*k+10); }
 function render(){
   const scene=playing?playing.scene:cur(),px=1/vs*dpr;
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#2d2730'; ctx.fillRect(0,0,cv.width,cv.height);
@@ -203,6 +227,7 @@ function render(){
   if(mode!=='play'){ ctx.fillStyle='#ffffff38'; ctx.font='800 26px "Nunito",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText('OFF STAGE',-MX/2,-MY+14); ctx.fillText('OFF STAGE',W+MX/2,-MY+14); }
   const T=nowT(),wob=mode==='play'&&playing?takeWobble((it,tt)=>playing.preview?previewPose(it,playing.scene.take,tt):poseAt(it,playing.scene.take,tt),playing.t):liveWobble(scene),mats=sceneMats(scene,poseNow,T,true,wob);
   drawScene(ctx,scene,poseNow,T,mats,{wx:weatherNow(scene)});
+  if(mode==='setup'&&scene.sea!=null){ const y=scene.sea*H; ctx.save(); ctx.setLineDash([14*px,8*px]); ctx.lineWidth=3*px; ctx.strokeStyle='#2f8fe0'; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); ctx.restore(); } // sea level guide: setup only, never in the video
   // Off-stage "wings": cutouts stay visible here for the performer, but the video crops them out.
   ctx.save(); ctx.globalAlpha=.55; for(const it of scene.items){ const e=mats.get(it.id),c=cornersOf(e); if(!c) continue; const xs=[c.tl[0],c.tr[0],c.br[0],c.bl[0]],ys=[c.tl[1],c.tr[1],c.br[1],c.bl[1]];
     if(Math.min(...xs)<0||Math.max(...xs)>W||Math.min(...ys)<0||Math.max(...ys)>H){ ctx.save(); ctx.beginPath(); ctx.rect(-MX,-MY,VW,VH); ctx.rect(0,0,W,H); ctx.clip('evenodd'); drawWith(ctx,e); ctx.restore(); } } ctx.restore();
@@ -448,7 +473,7 @@ async function stopRecording(){ if(mode==='count') return; if(mode!=='rec') retu
   toast('Recorded! Press Preview to watch it.'); }
 async function nextScene(){ if(mode!=='rec'||!nextOpen()) return; const i=project.scenes.indexOf(cur()); finishTake(); const n=project.scenes[i+1]; curId=n.id; selId=null; mode='count'; const buf=await preload(n); renderScenes(); showScript(); renderPads(); beginTake(n,false,buf); }
 function showScript(){ const s=cur(),a=(mode==='rec'||mode==='count')&&s.script&&project.assets[s.script],v=$('scriptView'); v.hidden=!a; if(a){ if(!a.__u) a.__u=URL.createObjectURL(a.blob); $('scriptImg').src=a.__u; } }
-function setLive(on){ if(on) drawer(null); document.body.classList.toggle('live',on); showScript(); renderPads(); $('transport').hidden=on; $('recBar').hidden=!on; $('stopBtn').querySelector('.sq').hidden=false; $('stopBtn').lastChild.textContent=' Stop'; $('timer').hidden=false; $('micLevelWrap').hidden=!micOK; $('nextSceneBtn').hidden=true; $('timer').textContent='0:00'; resize(); }
+function setLive(on){ if(on) drawer(null); if($('todSlider').paint) setTimeout(paintSliders); document.body.classList.toggle('live',on); showScript(); renderPads(); $('transport').hidden=on; $('recBar').hidden=!on; $('stopBtn').querySelector('.sq').hidden=false; $('stopBtn').lastChild.textContent=' Stop'; $('timer').hidden=false; $('micLevelWrap').hidden=!micOK; $('nextSceneBtn').hidden=true; $('timer').textContent='0:00'; resize(); }
 
 /* ---------- live microphone meter and picker ---------- */
 function micPref(v){ try{ if(v===undefined) return localStorage.getItem('ca-mic')||''; localStorage.setItem('ca-mic',v); }catch(_){ return ''; } }
@@ -585,6 +610,7 @@ async function previewLib(path,btn){ const same=libPv&&libPv.btn===btn; stopLibP
 function drawThumb(c,s){ const g=c.getContext('2d'); g.setTransform(c.width/W,0,0,c.height/H,0,0); drawScene(g,s,it=>it); }
 function renderScenes(){ if(sd) return; /* don't rebuild the strip under a finger that's dragging it */ const box=$('sceneList'),keep=box.scrollLeft; box.innerHTML=''; project.scenes.forEach((s,i)=>{ const on=s.id===(playing?playing.scene.id:curId),b=document.createElement('button'); b.className='scene'+(on?' on':''); b.dataset.id=s.id; b.title='Hold and drag to move'; b.setAttribute('aria-label','Scene '+(i+1)+(s.take?', recorded':'')+'. Shift and arrow keys move it.');
     const c=document.createElement('canvas'); c.width=186;c.height=105; drawThumb(c,s); b.append(c); const n=document.createElement('span'); n.className='num'; n.textContent=i+1; b.append(n);
+    if(s.shadow){ const g=document.createElement('span'); g.className='sp'; g.textContent='🎭'; g.title='Shadow puppets'; b.append(g); b.setAttribute('aria-label',b.getAttribute('aria-label')+' Shadow puppets.'); }
     if(s.stage&&STAGE_NAMES[s.stage]){ const g=document.createElement('span'); g.className='stg'; g.textContent=s.stage==='next'?'Next':STAGE_NAMES[s.stage]; b.append(g); b.setAttribute('aria-label',b.getAttribute('aria-label')+' '+STAGE_NAMES[s.stage]+'.'); }
     if(s.take){ const t=document.createElement('span'); t.className='tick'; const cl=clipOf(s); t.textContent=(cl.len<s.take.dur-.01?'✂ ':'')+fmt(cl.len); b.append(t); }
     if(on&&mode==='setup'){ const x=document.createElement('span'); x.className='trash'; x.textContent='🗑'; x.setAttribute('role','button'); x.setAttribute('aria-label','Delete scene '+(i+1)); x.onpointerdown=e=>e.stopPropagation(); x.onclick=e=>{ e.stopPropagation(); deleteScene(); }; b.append(x); }
@@ -622,11 +648,11 @@ const sceneUp=e=>{ if(!sd||e.pointerId!==sd.id) return; clearTimeout(sd.timer); 
 window.addEventListener('pointerup',sceneUp); window.addEventListener('pointercancel',sceneUp);
 $('sceneList').addEventListener('touchmove',e=>{ if(sd&&sd.on) e.preventDefault(); },{passive:false});
 function showCurrentScene(){ const on=$('sceneList').querySelector('.scene.on'); if(on) on.scrollIntoView({block:'nearest',inline:'nearest'}); }
-function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?clipOf(prev).b:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; n.pads=[...(prev.pads||[])]; const ids=new Map(prev.items.map(i=>[i.id,uid()])); n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:ids.get(it.id),...(it.link&&ids.has(it.link)?{link:ids.get(it.link)}:{}),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,fixed:!!it.fixed,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
-function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
-function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ $('itEdge').classList.toggle('on',!!it.edge); $('itEdge').setAttribute('aria-pressed',!!it.edge); { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); const l=$('itLink'),m=it.link&&cur().items.find(i=>i.id===it.link); l.classList.toggle('on',!!m); l.innerHTML=m?'🔗<span class="lab2"> Unstick</span>':'🔗<span class="lab2"> Stick to…</span>'; l.setAttribute('aria-label',m?'Stuck to '+nameOf(m)+'. Press to unstick':'Stick to another cutout'); l.title=m?'Stuck to '+nameOf(m)+'. Press to unstick.':'Make this follow another cutout'; } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
+function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cur(),end=prev.take?clipOf(prev).b:0,n=blankScene(project.scenes.length+1); n.backdrop={...prev.backdrop}; n.ambience=prev.ambience; n.music=prev.music; for(const k of ['shadow','tod','sea']) if(prev[k]!=null) n[k]=prev[k]; n.pads=[...(prev.pads||[])]; const ids=new Map(prev.items.map(i=>[i.id,uid()])); n.items=prev.items.map(it=>{ const q=poseAt(it,prev.take,end); return {id:ids.get(it.id),...(it.link&&ids.has(it.link)?{link:ids.get(it.link)}:{}),assetId:it.assetId,x:q.x,y:q.y,s:q.s,r:q.r,flip:!!q.flip,anim:it.anim||null,fixed:!!it.fixed,...(it.loop?{loop:JSON.parse(JSON.stringify(it.loop))}:{})}; }); project.scenes.splice(project.scenes.indexOf(prev)+1,0,n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); toast('New scene: carry on from where the last one finished.'); }
+function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); if(cur().shadow) n.shadow=true; project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
+function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ $('itEdge').classList.toggle('on',!!it.edge); $('itEdge').setAttribute('aria-pressed',!!it.edge); { const L=$('itLight'); L.classList.toggle('on',!!it.light); L.setAttribute('aria-pressed',!!it.light); } { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); const l=$('itLink'),m=it.link&&cur().items.find(i=>i.id===it.link); l.classList.toggle('on',!!m); l.innerHTML=m?'🔗<span class="lab2"> Unstick</span>':'🔗<span class="lab2"> Stick to…</span>'; l.setAttribute('aria-label',m?'Stuck to '+nameOf(m)+'. Press to unstick':'Stick to another cutout'); l.title=m?'Stuck to '+nameOf(m)+'. Press to unstick.':'Make this follow another cutout'; } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
 function refreshTransport(){ const s=cur(),any=project.scenes.some(x=>x.take); $('playBtn').hidden=false; $('layerBtn').hidden=!s.take; $('playAllBtn').hidden=project.scenes.filter(x=>x.take).length<2; $('recBtn').lastChild.textContent=s.take?' Redo':' Record'; }
-function refreshAll(){ $('projName').value=project.name; $('shadowToggle').checked=shadowsOn(); renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
+function refreshAll(){ $('projName').value=project.name; $('shadowToggle').checked=shadowsOn(); { const b=$('shadowScene'),on=!!cur().shadow; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); } if($('todSlider').paint) paintSliders(); renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
 
 /* ---------- project files ---------- */
 const extOf=b=>({'image/png':'png','image/jpeg':'jpg','audio/wav':'wav','audio/mpeg':'mp3','audio/mp4':'m4a','audio/ogg':'ogg'}[b.type]||'bin');
@@ -842,6 +868,11 @@ function wire(){
   $('itFlip').onclick=flip;
   $('itLink').onclick=linkStart;
   $('itEdge').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.edge=!it.edge; updateItemBar(); dirty(); };
+  $('itLight').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.light=!it.light; updateItemBar(); dirty(); toast(it.light?(cur().tod>.5?'Light: it glows and lights up the dark around it.':'Light: it glows in the dark. Slide ☀️ down towards 🌙 to see it.'):'Not a light any more.',2600); };
+  $('shadowScene').onclick=()=>{ if(mode!=='setup') return; checkpoint(); const s=cur(); if(s.shadow) delete s.shadow; else s.shadow=true; refreshAll(); dirty(); toast(s.shadow?'Shadow puppets: this scene is a lamp-lit screen, and the cutouts are shadows. Holes cut in a cutout let the light through.':'Back to colour.',3200); };
+  $('allShadow').onclick=()=>{ checkpoint(); project.scenes.forEach(s=>s.shadow=true); refreshAll(); dirty(); $('menuDlg').close(); toast('Every scene is shadow puppets.'); };
+  $('allColour').onclick=()=>{ checkpoint(); project.scenes.forEach(s=>delete s.shadow); refreshAll(); dirty(); $('menuDlg').close(); toast('Every scene is in colour.'); };
+  sliderWire();
   $('itFixed').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.fixed=!it.fixed; updateItemBar(); dirty(); toast(it.fixed?'Pinned: it stays put while recording, and taps go through it.':'Not pinned: you can drag it while recording.',2400); };
   $('itLoop').onclick=()=>{ const it=sel(); if(!it) return; if(it.loop){ checkpoint(); it.loop.on=!it.loop.on; updateItemBar(); dirty(); } else teachStart(); };
   $('itLoopRedo').onclick=teachStart;

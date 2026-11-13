@@ -31,6 +31,12 @@ Work also autosaves on the device and is offered back next time the page opens.
 - **Shadows:** every cutout has a soft drop shadow, as if held just in front of the backdrop (smaller for pinned cutouts). Turn it off for a project in the ☰ menu.
 - **Wobble:** when a cutout starts, stops or changes direction quickly, it tips and squashes a little, then settles, like a paper puppet on a stick. Hop squashes a little as it lands. The wobble comes from the recorded movement, so Preview and the video match the performance.
 
+## Day, night, sea and shadow puppets
+
+- **Day and night:** while setting up, the ☀️ slider left of the stage moves the sun across the sky to sunset, dusk and night (moonlight). A cutout marked 💡 **Light** lights up the dark around it; stick it to a character to carry it, or pin it in place.
+- **Sea:** the 🌊 slider right of the stage sets the sea level. Below the line, the backdrop and cutouts are gently tinted and rippled under a subtle, hand-cut wavy edge. All the way down means no sea. The dashed line only shows while setting up.
+- **Shadow puppets:** 🎭 on the Backdrop tab makes a scene a warm, lamp-lit paper screen: cutouts become soft shadows (holes cut with Erase let the light through) and the backdrop becomes faint scenery. Weather and water become shadows too. New scenes follow the current scene, and the ☰ menu switches every scene at once. Scenes change straight from colour to shadow, without a fade.
+
 ## Templates for a whole class
 
 1. Print the [scene template](templates/cutout-template-A4.pdf) (one sheet = one scene) or the [story template](templates/story-template-A4.pdf). They're A4, so print them at A3 size if you want more room to draw. A scene sheet has a backdrop box, four character boxes with movement ticks, a script area, and ticks for one of seven background sounds and seven music styles. The story template has a cast page with six characters, then an Orientation, Complication, What happens next and Resolution page, each with a backdrop, a short summary of what happens, sound and music ticks, and "Who is in this scene?" ticks. Print as many What happens next pages as the story needs, and tick 1, 2, 3… on them.
