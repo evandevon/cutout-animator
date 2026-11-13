@@ -23,22 +23,24 @@ const Weather=(()=>{
     else if(kind==='sparkles'){ const p=[]; for(let i=0;i<8;i++){ const a=i/8*Math.PI*2-Math.PI/2,R=i%2?7:24; p.push([Math.cos(a)*R,Math.sin(a)*R]); } cutPath(g,p,r); paper(['#ffe46b','#fff6c4','#ffd23f'][variant%3],1.6); }
     else { const p=[]; for(let i=0;i<14;i++){ const a=i/14*Math.PI*2; p.push([Math.cos(a)*18*(1-.25*Math.cos(a*2)),Math.sin(a)*11]); } cutPath(g,p,r); paper(['#f6b3cf','#f9cde0','#ee98bd'][variant%3]); }
     return c; }
-  const sprites=new Map(); const spr=(k,v,dark)=>{ const key=k+v+(dark?'d':''); let c=sprites.get(key); if(!c){ c=sprite(k,v); if(dark){ const g=c.getContext('2d'); g.globalCompositeOperation='source-in'; g.fillStyle='rgba(33,23,15,.85)'; g.fillRect(0,0,64,64); } sprites.set(key,c); } return c; }; // dark: as shadows, for shadow puppet scenes
+  const sprites=new Map(); const spr=(k,v,dark)=>{ const key=k+v+(dark?'d':''); let c=sprites.get(key); if(!c){ c=sprite(k,v); if(dark){ const g=c.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.shadowColor='transparent'; g.globalCompositeOperation='source-in'; g.fillStyle='rgba(33,23,15,.85)'; g.fillRect(0,0,64,64); } sprites.set(key,c); } return c; }; // dark: as shadows, for shadow puppet scenes
   // how each kind moves: count, size (stage px), speed (px/s), sideways drift, sway and spin
-  const CFG={rain:{n:90,size:[16,26],vy:[700,950],vx:-160,sway:0,spin:0,tilt:.17},snow:{n:70,size:[10,22],vy:[45,95],vx:12,sway:26,spin:.8},
+  const CFG={rain:{n:75,size:[16,26],vy:[700,950],vx:-160,sway:0,spin:0,tilt:.17},snow:{n:70,size:[10,22],vy:[45,95],vx:12,sway:26,spin:.8},
     bubbles:{n:28,size:[22,58],vy:[-140,-60],vx:0,sway:22,spin:0},leaves:{n:24,size:[34,54],vy:[60,120],vx:150,sway:40,spin:2.4},
     sparkles:{n:38,size:[16,34],vy:[-14,14],vx:0,sway:10,spin:.4,twinkle:true},petals:{n:30,size:[18,30],vy:[50,95],vx:70,sway:30,spin:1.8}};
-  function drawKind(g,k,t,alpha,W,H,dark){ const C=CFG[k],r=rng(k.length*1000+k.charCodeAt(0)),tq=Math.floor(t/STEP)*STEP,M=80;
-    for(let i=0;i<C.n;i++){ const x0=r()*(W+2*M),y0=r()*(H+2*M),sz=C.size[0]+r()*(C.size[1]-C.size[0]),vy=C.vy[0]+r()*(C.vy[1]-C.vy[0]),ph=r()*6.28,v=i%4,dir=r()<.5?-1:1;
+  function drawKind(g,k,t,alpha,W,H,dark,dens=1){ const C=CFG[k],r=rng(k.length*1000+k.charCodeAt(0)),tq=Math.floor(t/STEP)*STEP,M=80,T=g.getTransform(),ga=g.globalAlpha;
+    const n=Math.round(C.n*dens); for(let i=0;i<C.n;i++){ const x0=r()*(W+2*M),y0=r()*(H+2*M),sz=C.size[0]+r()*(C.size[1]-C.size[0]),vy=C.vy[0]+r()*(C.vy[1]-C.vy[0]),ph=r()*6.28,v=i%4,dir=r()<.5?-1:1;
       const span=H+2*M,wrapW=W+2*M; let y=((y0+vy*tq)%span+span)%span-M,x=((x0+C.vx*tq*(.6+.4*(i%3)/2)+Math.sin(tq*1.3+ph)*C.sway)%wrapW+wrapW)%wrapW-M;
       let a=alpha,s=sz/40; if(C.twinkle){ const tw=.5+.5*Math.sin(tq*3.1+ph); s*=.55+.6*tw; a*=.35+.65*tw; }
-      g.save(); g.globalAlpha=a; g.translate(x,y); g.rotate(C.tilt||(C.spin*tq*dir+ph)); g.scale(s,s); g.drawImage(spr(k,v,dark),-32,-32); g.restore(); } }
+      if(i>=n) continue; const ang=C.tilt||(C.spin*tq*dir+ph),cs=Math.cos(ang)*s,sn=Math.sin(ang)*s; g.globalAlpha=ga*a;
+      g.setTransform(T.a*cs+T.c*sn,T.b*cs+T.d*sn,-T.a*sn+T.c*cs,-T.b*sn+T.d*cs,T.a*x+T.c*y+T.e,T.b*x+T.d*y+T.f); g.drawImage(spr(k,v,dark),-32,-32); }
+    g.setTransform(T); g.globalAlpha=ga; }
   /* What's on at scene time t: the scene's starting weather, then the taps made while recording (events: {t, k, on}).
      Each kind fades in or out over FADE seconds after a tap. */
   function levels(start,events,t){ const out={};
     for(const {k} of KINDS){ let on=!!(start&&start.includes(k)),te=-1e9,was=on; for(const e of events||[]){ if(e.k!==k||e.t>t) continue; was=on; on=e.on; te=e.t; }
       const f=Math.min(1,(t-te)/FADE),v=on?(was?1:f):(was?1-f:0); if(v>0) out[k]=v; } return out; }
-  function draw(g,start,events,t,W,H,dark){ const L=levels(start,events,t); for(const k in L) drawKind(g,k,t,L[k],W,H,dark); }
+  function draw(g,start,events,t,W,H,dark,dens){ const L=levels(start,events,t); for(const k in L) drawKind(g,k,t,L[k],W,H,dark,dens); }
   const isOn=(start,events,t,k)=>{ let on=!!(start&&start.includes(k)); for(const e of events||[]) if(e.k===k&&e.t<=t) on=e.on; return on; };
   return {KINDS,draw,levels,isOn};
 })();

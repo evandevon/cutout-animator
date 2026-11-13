@@ -17,13 +17,24 @@ const StageFX=(()=>{
     const r=rng(4242); // paper fibres and a faint weave
     for(let i=0;i<2600;i++){ const x=r()*W,y=r()*H,l=4+r()*22,a=r()*Math.PI; g.strokeStyle=r()<.5?'rgba(120,70,20,.05)':'rgba(255,250,235,.07)'; g.lineWidth=.6+r()*1.1; g.beginPath(); g.moveTo(x,y); g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l); g.stroke(); }
     g.fillStyle='rgba(110,60,20,.022)'; for(let y=0;y<H;y+=3) g.fillRect(0,y,W,1); for(let x=0;x<W;x+=3) g.fillRect(x,0,1,H);
+    // soft blotches, like thicker and thinner parts of handmade paper
+    const bw=48,bh=27,b=mk(bw,bh),bg=b.getContext('2d'),bd=bg.createImageData(bw,bh); for(let i=0;i<bw*bh;i++){ const v=r(); bd.data[i*4]=v<.5?90:255; bd.data[i*4+1]=v<.5?50:245; bd.data[i*4+2]=v<.5?15:225; bd.data[i*4+3]=Math.round(Math.abs(v-.5)*2*34); } bg.putImageData(bd,0,0);
+    g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(b,0,0,W,H);
+    // fine grain
+    const gd=g.getImageData(0,0,W,H),D=gd.data; for(let i=0;i<D.length;i+=4){ const n=(r()-.5)*16; D[i]+=n; D[i+1]+=n; D[i+2]+=n*.8; } g.putImageData(gd,0,0);
+    // a few longer fibres
+    for(let i=0;i<260;i++){ const x=r()*W,y=r()*H,a=r()*Math.PI,l=20+r()*50; g.strokeStyle=r()<.5?'rgba(110,60,20,.07)':'rgba(255,248,230,.1)'; g.lineWidth=.8; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+Math.cos(a+.6)*l/2,y+Math.sin(a+.6)*l/2,x+Math.cos(a)*l,y+Math.sin(a)*l); g.stroke(); }
     screenC=c; return c; }
   // The backdrop as faint scenery painted on the screen: darker parts of the drawing become darker shadow.
   const sceneryCache=new Map();
   function scenery(key,W,H,draw){ let c=sceneryCache.get(key); if(c) return c; const w=Math.round(W/2),h=Math.round(H/2); c=mk(w,h); const g=c.getContext('2d',{willReadFrequently:true}); g.scale(.5,.5); const ready=draw(g)!==false;
     const d=g.getImageData(0,0,w,h),D=d.data; for(let i=0;i<D.length;i+=4){ const L=(.3*D[i]+.59*D[i+1]+.11*D[i+2])/255; D[i+3]=Math.round(255*Math.max(0,Math.min(1,(.92-L)*1.25))*.5*(D[i+3]/255)); D[i]=33; D[i+1]=23; D[i+2]=15; }
     g.putImageData(d,0,0); if(ready){ if(sceneryCache.size>30) sceneryCache.clear(); sceneryCache.set(key,c); } return c; }
-  function screen(c,W,H,t,key,drawBack){ c.drawImage(screenTexture(W,H),0,0,W,H); if(drawBack) c.drawImage(scenery(key,W,H,drawBack),0,0,W,H);
+  const screenCache=new Map();
+  function screen(c,W,H,t,key,drawBack){ let S=screenCache.get(key);
+    if(!S){ S=mk(W,H); const g=S.getContext('2d'); g.drawImage(screenTexture(W,H),0,0); let ready=true; if(drawBack){ const sc=scenery(key,W,H,d=>{ const r=drawBack(d); ready=r!==false; return r; }); g.drawImage(sc,0,0,W,H); }
+      if(ready){ if(screenCache.size>12) screenCache.clear(); screenCache.set(key,S); } }
+    c.drawImage(S,0,0,W,H);
     const q=stepT(t),f=.018+.014*Math.sin(q*7.3)*Math.sin(q*2.1+1); c.fillStyle=`rgba(60,30,5,${Math.max(0,f)})`; c.fillRect(0,0,W,H); } // a lamp flickers very slightly
   const sils=new WeakMap();
   function silhouette(im){ let S=sils.get(im); if(S) return S; const w=im.naturalWidth,h=im.naturalHeight; if(!w||!h||!im.complete) return null; const b=Math.max(1.5,Math.max(w,h)*.006),pad=Math.ceil(b*3);
@@ -37,18 +48,18 @@ const StageFX=(()=>{
   function wavePath(c,W,H,y0,q){ c.beginPath(); c.moveTo(-10,H+10); for(let x=-10;x<=W+10;x+=16) c.lineTo(x,edgeY(x,y0,q)); c.lineTo(W+10,H+10); c.closePath(); }
   let snap=null;
   function water(c,W,H,sea,t,shadow){ if(sea==null) return; const y0=sea*H,q=stepT(t);
-    if(shadow){ c.save(); wavePath(c,W,H,y0,q); c.fillStyle='rgba(33,23,15,.9)'; c.fill(); c.restore(); return; } // a cardboard wave strip, in shadow
-    const T=c.getTransform(),sx=T.a,dx0=T.e,dy0=T.f+(y0-8)*T.d,dw=Math.round(W*sx),dh=Math.round((H-y0+8)*T.d);
-    c.save(); wavePath(c,W,H,y0,q); c.clip();
-    if(dw>0&&dh>0&&c.canvas){ // a slight ripple: everything under the water shifts sideways a little, in bands
+    if(shadow){ c.save(); wavePath(c,W,H,y0,q); c.fillStyle='rgba(33,23,15,.9)'; c.fill(); c.restore(); return; } // a cardboard wave strip, in shadow: hard, wavy edge
+    // In colour the water fades in softly, so it blends with whatever waterline a child has drawn, straight or sloping.
+    const F=34,top=y0-F,T=c.getTransform(),sx=T.a,dx0=T.e,dy0=T.f+top*T.d,dw=Math.round(W*sx),dh=Math.round((H-top)*T.d);
+    c.save(); c.beginPath(); c.rect(0,top,W,H-top); c.clip();
+    if(dw>0&&dh>0&&c.canvas){ // ripple: everything under the water shifts sideways a little, in bands, building up below the surface
       if(!snap) snap=mk(dw,dh); if(snap.width!==dw||snap.height!==dh){ snap.width=dw; snap.height=dh; } const sg=snap.getContext('2d'); sg.clearRect(0,0,dw,dh); sg.drawImage(c.canvas,dx0,dy0,dw,dh,0,0,dw,dh);
-      c.setTransform(1,0,0,1,0,0); const band=Math.max(2,Math.round(3*T.d/(T.d>1.2?1:.7))),amp=1.3*sx;
-      for(let y=0;y<dh;y+=band){ const o=amp*Math.sin(y/(9*T.d)+q*2.2)*Math.min(1,y/(20*T.d)); c.drawImage(snap,0,y,dw,band,dx0+o,dy0+y,dw,band); }
+      c.setTransform(1,0,0,1,0,0); const band=Math.max(3,Math.round(4*T.d)),amp=1.95*sx,fd=2*F*T.d;
+      for(let y=0;y<dh;y+=band){ const o=amp*Math.sin(y/(9*T.d)+q*2.2)*Math.min(1,y/fd); if(Math.abs(o)<.05) continue; c.drawImage(snap,0,y,dw,band,dx0+o,dy0+y,dw,band); }
       c.setTransform(T); }
-    const g=c.createLinearGradient(0,y0,0,H); g.addColorStop(0,'rgba(55,155,170,.17)'); g.addColorStop(1,'rgba(25,95,125,.3)'); c.fillStyle=g; c.fillRect(0,y0-10,W,H-y0+20);
+    const g=c.createLinearGradient(0,top,0,H); g.addColorStop(0,'rgba(55,155,170,0)'); g.addColorStop(Math.min(.9,2*F/(H-top)),'rgba(55,155,170,.17)'); g.addColorStop(1,'rgba(25,95,125,.3)'); c.fillStyle=g; c.fillRect(0,top,W,H-top);
     c.lineCap='round'; for(const f of FLECKS){ const x=((f.x*W+f.v*q*6)%W+W)%W,y=y0+14+f.y*(H-y0-20); if(y>H-4) continue; c.strokeStyle='rgba(235,250,255,.16)'; c.lineWidth=2.2; c.beginPath(); c.moveTo(x,y); c.lineTo(x+f.l,y); c.stroke(); }
-    c.restore();
-    c.save(); c.beginPath(); for(let x=-10;x<=W+10;x+=16){ const y=edgeY(x,y0,q); x<0?c.moveTo(x,y):c.lineTo(x,y); } c.lineWidth=2.4; c.strokeStyle='rgba(255,255,255,.42)'; c.stroke(); c.translate(0,2.2); c.lineWidth=1.2; c.strokeStyle='rgba(20,80,100,.22)'; c.stroke(); c.restore(); }
+    c.restore(); }
 
   /* ---------- day and night ---------- */
   const TINT=[[0,[255,255,255]],[.3,[255,250,238]],[.5,[255,232,204]],[.6,[246,200,178]],[.7,[172,150,190]],[.82,[112,124,176]],[1,[80,92,150]]];
@@ -57,10 +68,11 @@ const StageFX=(()=>{
   function glow(c,x,y,R,rgb,a){ if(a<=.003) return; const g=c.createRadialGradient(x,y,0,x,y,R); g.addColorStop(0,`rgba(${rgb},${a})`); g.addColorStop(.35,`rgba(${rgb},${a*.45})`); g.addColorStop(1,`rgba(${rgb},0)`); c.fillStyle=g; c.fillRect(x-R,y-R,2*R,2*R); }
   let map=null;
   function daylight(c,W,H,v,hz,lights){ if(!(v>.01)) return; const T=c.getTransform(),cw=c.canvas.width,ch=c.canvas.height,tint=tintAt(v),d=1-(.3*tint[0]+.59*tint[1]+.11*tint[2])/255;
-    if(!map) map=mk(cw,ch); if(map.width!==cw||map.height!==ch){ map.width=cw; map.height=ch; } const m=map.getContext('2d');
-    m.setTransform(1,0,0,1,0,0); m.globalCompositeOperation='source-over'; m.fillStyle='#fff'; m.fillRect(0,0,cw,ch); m.setTransform(T); m.fillStyle=`rgb(${tint})`; m.fillRect(0,0,W,H);
+    const Q=4,mw=Math.ceil(cw/Q),mh=Math.ceil(ch/Q); // the light map is soft, so a quarter-size one looks the same and is much quicker
+    if(!map) map=mk(mw,mh); if(map.width!==mw||map.height!==mh){ map.width=mw; map.height=mh; } const m=map.getContext('2d');
+    m.setTransform(1,0,0,1,0,0); m.globalCompositeOperation='source-over'; m.fillStyle='#fff'; m.fillRect(0,0,mw,mh); m.setTransform(T.a/Q,T.b/Q,T.c/Q,T.d/Q,T.e/Q,T.f/Q); m.fillStyle=`rgb(${tint})`; m.fillRect(0,0,W,H);
     for(const L of lights){ const g=m.createRadialGradient(L.x,L.y,0,L.x,L.y,L.R); g.addColorStop(0,'rgba(255,250,236,1)'); g.addColorStop(.45,'rgba(255,240,215,.75)'); g.addColorStop(1,'rgba(255,240,215,0)'); m.fillStyle=g; m.fillRect(L.x-L.R,L.y-L.R,2*L.R,2*L.R); }
-    c.save(); c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation='multiply'; c.drawImage(map,0,0); c.restore();
+    c.save(); c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation='multiply'; c.imageSmoothingEnabled=true; c.drawImage(map,0,0,mw*Q,mh*Q); c.restore();
     if(v>.3&&v<.8){ const a=Math.sin((v-.3)/.5*Math.PI)*.75,g=c.createLinearGradient(0,0,0,hz); g.addColorStop(0,'rgba(120,80,170,'+(a*.5)+')'); g.addColorStop(.55,'rgba(255,150,90,'+(a*.6)+')'); g.addColorStop(1,'rgba(255,120,60,'+a+')'); // a warm sky, glowing most near the horizon
       c.save(); c.globalCompositeOperation='soft-light'; c.fillStyle=g; c.fillRect(0,0,W,H); c.restore(); }
     c.save(); c.globalCompositeOperation='screen';

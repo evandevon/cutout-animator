@@ -117,7 +117,7 @@ function localMat(it,p,im,t,w){ const h0=im?im.naturalHeight:0,fl=p.flip?-1:1,v=
 /* Paper wobble: when a cutout stops, starts or changes direction quickly it tips and squashes a little, then settles,
    like a paper puppet on a stick. It's worked out from where the cutout was over the last moment (at(t) gives [x, y]),
    so a recording plays back and exports with exactly the same wobble. Gentle moves don't wobble at all. */
-const WOB={w:2*Math.PI*2.6,z:.24,win:.9,h:1/60,dead:4000,gr:.005,gq:.0034};
+const WOB={w:2*Math.PI*2.6,z:.24,win:.9,h:1/60,dead:4000,gr:.0015,gq:.00102};
 function wobbleSim(at,t){ const {w,z,win,h,dead,gr,gq}=WOB,n=Math.round(win/h),dz=a=>Math.abs(a)<dead?0:Math.sign(a)*(Math.abs(a)-dead);
   let P=at(t-win-h),Q=at(t-win); if(!P||!Q) return null; let vx=(Q[0]-P[0])/h,vy=(Q[1]-P[1])/h,r=0,rv=0,q=0,qv=0,moved=false; P=Q;
   for(let k=n-1;k>=0;k--){ const R=at(t-k*h); if(!R) continue; const sx=(R[0]-P[0])/h,sy=(R[1]-P[1])/h,e=Math.min(1,h/.05),nx=vx+(sx-vx)*e,ny=vy+(sy-vy)*e,ax=dz((nx-vx)/h),ay=dz((ny-vy)/h); vx=nx; vy=ny; P=R;
@@ -172,7 +172,7 @@ function drawScene(c,scene,poseOf,t=0,mats,o={}){ mats=mats||sceneMats(scene,pos
     for(const it of scene.items){ const e=mats.get(it.id); if(!e||!e.im) continue; const S=StageFX.silhouette(e.im); if(!S) continue; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); } }
   else { drawBackdrop(c,scene.backdrop); const sh=shadowsOn(); for(const it of scene.items){ const e=mats.get(it.id); if(sh) drawShadow(c,e); drawWith(c,e); } }
   StageFX.water(c,W,H,scene.sea,t,sp);
-  if(o.wx) Weather.draw(c,scene.wx,o.wx.events,o.wx.t,W,H,sp);
+  if(o.wx) Weather.draw(c,scene.wx,o.wx.events,o.wx.t,W,H,sp,o.wx.dens||1);
   if(!sp&&scene.tod>.01){ const lights=[]; for(const it of scene.items){ if(!it.light) continue; const e=mats.get(it.id); if(!e||!e.im) continue; const [x,y]=mapp(e.m,0,0),sz=Math.max(e.im.naturalWidth,e.im.naturalHeight)*Math.sqrt(Math.abs(mdet(e.m))); lights.push({x,y,R:clamp(sz*1.7,150,460)}); }
     StageFX.daylight(c,W,H,scene.tod,scene.sea!=null?scene.sea*H:H,lights); }
   c.restore(); }
@@ -196,7 +196,13 @@ function poseAt(it,take,t){
 }
 
 const cv=$('stage'),ctx=cv.getContext('2d'); let vs=1,dpr=1;
-function resize(){ const wr=$('stageWrap'),cs=getComputedStyle(wr),b={width:wr.clientWidth,height:wr.clientHeight-parseFloat(cs.paddingTop)}; if(!b.width||b.height<=0) return; dpr=Math.min(2.5,devicePixelRatio||1); const k=Math.min(b.width/VW,b.height/VH),cw=Math.floor(VW*k),ch=Math.floor(VH*k);
+/* Automatic quality: if frames take too long (a slow phone or laptop with lots of effects on), draw the stage a little
+   less sharp until it runs smoothly, and sharpen again when there's room. Only the screen changes: videos are always full quality. */
+const perf={q:1,ft:[],t:0};
+function perfFrame(dt){ if(document.hidden||dt>.25) return; const f=perf.ft; f.push(dt); if(f.length<45) return; const avg=f.reduce((a,b)=>a+b,0)/f.length; f.length=0;
+  const base=Math.min(2.5,devicePixelRatio||1),min=Math.min(1,.75/base*1.0001);
+  if(avg>.03&&perf.q>min){ perf.q=Math.max(min,perf.q*.8); resize(); } else if(avg<.0175&&perf.q<1&&++perf.t>3){ perf.t=0; perf.q=Math.min(1,perf.q*1.12); resize(); } }
+function resize(){ const wr=$('stageWrap'),cs=getComputedStyle(wr),b={width:wr.clientWidth,height:wr.clientHeight-parseFloat(cs.paddingTop)}; if(!b.width||b.height<=0) return; dpr=Math.min(2.5,devicePixelRatio||1)*perf.q; const k=Math.min(b.width/VW,b.height/VH),cw=Math.floor(VW*k),ch=Math.floor(VH*k);
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; cv.width=Math.floor(cw*dpr); cv.height=Math.floor(ch*dpr); vs=cv.width/VW; if($('todSlider').paint) paintSliders(); }
 new ResizeObserver(resize).observe($('stageWrap'));
 function poseNow(it){ if(mode==='rec') return live.get(it.id)||it; if(mode==='play'&&playing) return playing.preview?previewPose(it,playing.scene.take,playing.t):poseAt(it,playing.scene.take,playing.t); return it; } // taught moves only play when playing or recording; setup shows their path instead (drawPaths)
@@ -226,7 +232,7 @@ function render(){
   ctx.setTransform(vs,0,0,vs,MX*vs,MY*vs); ctx.imageSmoothingQuality='high';
   if(mode!=='play'){ ctx.fillStyle='#ffffff38'; ctx.font='800 26px "Nunito",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText('OFF STAGE',-MX/2,-MY+14); ctx.fillText('OFF STAGE',W+MX/2,-MY+14); }
   const T=nowT(),wob=mode==='play'&&playing?takeWobble((it,tt)=>playing.preview?previewPose(it,playing.scene.take,tt):poseAt(it,playing.scene.take,tt),playing.t):liveWobble(scene),mats=sceneMats(scene,poseNow,T,true,wob);
-  drawScene(ctx,scene,poseNow,T,mats,{wx:weatherNow(scene)});
+  drawScene(ctx,scene,poseNow,T,mats,{wx:{...weatherNow(scene),dens:perf.q<.75?.55:1}}); // a slow device shows fewer drops on screen (never in the video)
   if(mode==='setup'&&scene.sea!=null){ const y=scene.sea*H; ctx.save(); ctx.setLineDash([14*px,8*px]); ctx.lineWidth=3*px; ctx.strokeStyle='#2f8fe0'; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); ctx.restore(); } // sea level guide: setup only, never in the video
   // Off-stage "wings": cutouts stay visible here for the performer, but the video crops them out.
   ctx.save(); ctx.globalAlpha=.55; for(const it of scene.items){ const e=mats.get(it.id),c=cornersOf(e); if(!c) continue; const xs=[c.tl[0],c.tr[0],c.br[0],c.bl[0]],ys=[c.tl[1],c.tr[1],c.br[1],c.bl[1]];
@@ -290,8 +296,9 @@ let hitGroup=false;
 /* Taps go through the see-through gaps in a cutout (between an arm and a body, say) to whatever is behind.
    First look for a cutout drawn right under the finger; only if there's none, allow a near miss. */
 const cssPx=()=>dpr/vs; // stage units per screen pixel
-function hit(x,y,touch){ hitGroup=false; const mats=matsNow(); for(const tol of [0,(touch?14:7)*cssPx()]){ const it=hitAny(x,y,false,mats,tol)||(mode==='setup'?hitAny(x,y,true,mats,tol):null); if(it) return it; } return null; }
+function hit(x,y,touch){ hitGroup=false; const mats=matsNow(); for(const tol of [0,(touch?14:7)*cssPx(),Infinity]){ /* Infinity: anywhere in its box, if nothing else is there */ const it=hitAny(x,y,false,mats,tol)||(mode==='setup'?hitAny(x,y,true,mats,tol):null); if(it) return it; } return null; }
 function pixelHit(e,x,y,tol=0){ if(!e||!e.im) return false; const sc=Math.hypot(e.m[2],e.m[3])||.01,[lx,ly]=mapp(minv(e.m),x,y),w=e.im.naturalWidth,h=e.im.naturalHeight;
+  if(tol===Infinity){ const [lx,ly]=mapp(minv(e.m),x,y); return Math.abs(lx)<=e.im.naturalWidth/2&&Math.abs(ly)<=e.im.naturalHeight/2; }
   let ti=tol/sc; if(e.it&&e.it.edge) ti+=clamp(Math.max(w,h)*.024,5,34); // the paper edge is part of what you see
   if(Math.abs(lx)>w/2+ti||Math.abs(ly)>h/2+ti) return false; const hm=hitMaps.get(e.it.assetId); if(!hm) return true;
   const u=(lx/w+.5)*hm.w|0,v=(ly/h+.5)*hm.h|0,r=Math.min(10,Math.ceil(ti*hm.w/w)),on=(X,Y)=>X>=0&&Y>=0&&X<hm.w&&Y<hm.h&&hm.a[Y*hm.w+X]>40;
@@ -544,7 +551,7 @@ function trimWire(){
 }
 
 function tick(now){
-  rafId=requestAnimationFrame(tick); const dt=Math.min(.1,(now-lastTick)/1000||.016); lastTick=now;
+  rafId=requestAnimationFrame(tick); perfFrame((now-lastTick)/1000||.016); const dt=Math.min(.1,(now-lastTick)/1000||.016); lastTick=now;
   if(mode==='rec'&&rec){ const t=recTime(); if(t>=0){ sample(t,dt); $('timer').textContent=fmt(t); } }
   paintMeter(); teachTick(now);
   if(mode==='play'&&playing&&playing.preview){ if(!playing.paused&&!trimDrag) playing.t=Math.max(0,Sound.audioCtx().currentTime-playing.t0); const over=playing.t>=playing.end,before=playing.t<playing.start-.01,note=over||before; if(note!==!!playing.over){ playing.over=note; $('timer').classList.toggle('note',note); } $('timer').textContent=over?(playing.scene.take?'🎬 Video ends here':'Not recorded yet'):before?'✂ Cut from the video':fmt(playing.t-playing.start); if(!playing.paused) trimPaint(); }
@@ -652,7 +659,7 @@ function continueStory(){ if(mode!=='setup') return; checkpoint(); const prev=cu
 function addScene(){ if(mode!=='setup') return; checkpoint(); const n=blankScene(project.scenes.length+1); if(cur().shadow) n.shadow=true; project.scenes.push(n); curId=n.id; selId=null; refreshAll(); showCurrentScene(); dirty(); }
 function updateItemBar(){ const it=sel(); $('itemBar').hidden=!it||mode!=='setup'; if(it){ $('itEdge').classList.toggle('on',!!it.edge); $('itEdge').setAttribute('aria-pressed',!!it.edge); { const L=$('itLight'); L.classList.toggle('on',!!it.light); L.setAttribute('aria-pressed',!!it.light); } { const f=$('itFixed'); f.classList.toggle('on',!!it.fixed); f.setAttribute('aria-pressed',!!it.fixed); const l=$('itLink'),m=it.link&&cur().items.find(i=>i.id===it.link); l.classList.toggle('on',!!m); l.innerHTML=m?'🔗<span class="lab2"> Unstick</span>':'🔗<span class="lab2"> Stick to…</span>'; l.setAttribute('aria-label',m?'Stuck to '+nameOf(m)+'. Press to unstick':'Stick to another cutout'); l.title=m?'Stuck to '+nameOf(m)+'. Press to unstick.':'Make this follow another cutout'; } document.querySelectorAll('[data-anim]').forEach(b=>{ const on=it.anim===b.dataset.anim; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); const l=$('itLoop'),has=!!it.loop; $('itLoopRedo').hidden=!has; l.innerHTML=has?(it.loop.on?'🔁<span class="lab2"> Move: on</span>':'🔁<span class="lab2"> Move: off</span>'):'🔁<span class="lab2"> Teach a move</span>'; l.classList.toggle('on',has&&it.loop.on); l.setAttribute('aria-label',has?(it.loop.on?'Looping move is on':'Looping move is off'):'Teach a looping move'); } }
 function refreshTransport(){ const s=cur(),any=project.scenes.some(x=>x.take); $('playBtn').hidden=false; $('layerBtn').hidden=!s.take; $('playAllBtn').hidden=project.scenes.filter(x=>x.take).length<2; $('recBtn').lastChild.textContent=s.take?' Redo':' Record'; }
-function refreshAll(){ $('projName').value=project.name; $('shadowToggle').checked=shadowsOn(); { const b=$('shadowScene'),on=!!cur().shadow; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); } if($('todSlider').paint) paintSliders(); renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
+function refreshAll(){ $('projName').value=project.name; $('shadowToggle').checked=shadowsOn(); { const b=$('shadowScene'),on=!!cur().shadow; b.innerHTML=on?'🖐<span class="lab2"> Stick puppets</span>':'🎭<span class="lab2"> Shadow puppets</span>'; b.title=on?'Switch this scene back to colour stick puppets':'Turn this scene into a shadow puppet show'; b.setAttribute('aria-label',on?'Switch this scene to stick puppets':'Switch this scene to shadow puppets'); } if($('todSlider').paint) paintSliders(); renderCast(); renderBack(); renderSoundTab(); renderScenes(); updateItemBar(); refreshTransport(); refreshHint(); undoBtns(); }
 
 /* ---------- project files ---------- */
 const extOf=b=>({'image/png':'png','image/jpeg':'jpg','audio/wav':'wav','audio/mpeg':'mp3','audio/mp4':'m4a','audio/ogg':'ogg'}[b.type]||'bin');
@@ -869,9 +876,7 @@ function wire(){
   $('itLink').onclick=linkStart;
   $('itEdge').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.edge=!it.edge; updateItemBar(); dirty(); };
   $('itLight').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.light=!it.light; updateItemBar(); dirty(); toast(it.light?(cur().tod>.5?'Light: it glows and lights up the dark around it.':'Light: it glows in the dark. Slide ☀️ down towards 🌙 to see it.'):'Not a light any more.',2600); };
-  $('shadowScene').onclick=()=>{ if(mode!=='setup') return; checkpoint(); const s=cur(); if(s.shadow) delete s.shadow; else s.shadow=true; refreshAll(); dirty(); toast(s.shadow?'Shadow puppets: this scene is a lamp-lit screen, and the cutouts are shadows. Holes cut in a cutout let the light through.':'Back to colour.',3200); };
-  $('allShadow').onclick=()=>{ checkpoint(); project.scenes.forEach(s=>s.shadow=true); refreshAll(); dirty(); $('menuDlg').close(); toast('Every scene is shadow puppets.'); };
-  $('allColour').onclick=()=>{ checkpoint(); project.scenes.forEach(s=>delete s.shadow); refreshAll(); dirty(); $('menuDlg').close(); toast('Every scene is in colour.'); };
+  $('shadowScene').onclick=()=>{ if(mode!=='setup') return; checkpoint(); const s=cur(); if(s.shadow) delete s.shadow; else s.shadow=true; refreshAll(); dirty(); toast(s.shadow?'Shadow puppets: this scene is a lamp-lit screen, and the cutouts are shadows. Holes cut in a cutout let the light through.':'Stick puppets: this scene is back in colour.',3200); };
   sliderWire();
   $('itFixed').onclick=()=>{ const it=sel(); if(!it) return; checkpoint(); it.fixed=!it.fixed; updateItemBar(); dirty(); toast(it.fixed?'Pinned: it stays put while recording, and taps go through it.':'Not pinned: you can drag it while recording.',2400); };
   $('itLoop').onclick=()=>{ const it=sel(); if(!it) return; if(it.loop){ checkpoint(); it.loop.on=!it.loop.on; updateItemBar(); dirty(); } else teachStart(); };

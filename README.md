@@ -34,8 +34,8 @@ Work also autosaves on the device and is offered back next time the page opens.
 ## Day, night, sea and shadow puppets
 
 - **Day and night:** while setting up, the ☀️ slider left of the stage moves the sun across the sky to sunset, dusk and night (moonlight). A cutout marked 💡 **Light** lights up the dark around it; stick it to a character to carry it, or pin it in place.
-- **Sea:** the 🌊 slider right of the stage sets the sea level. Below the line, the backdrop and cutouts are gently tinted and rippled under a subtle, hand-cut wavy edge. All the way down means no sea. The dashed line only shows while setting up.
-- **Shadow puppets:** 🎭 on the Backdrop tab makes a scene a warm, lamp-lit paper screen: cutouts become soft shadows (holes cut with Erase let the light through) and the backdrop becomes faint scenery. Weather and water become shadows too. New scenes follow the current scene, and the ☰ menu switches every scene at once. Scenes change straight from colour to shadow, without a fade.
+- **Sea:** the 🌊 slider right of the stage sets the sea level. Below the line, the backdrop and cutouts are gently tinted and rippled, fading in softly at the surface (in shadow scenes it's a hard, wavy cardboard edge). All the way down means no sea. The dashed line only shows while setting up.
+- **Shadow puppets:** 🎭 **Shadow puppets** (next to Preview) makes a scene a warm, lamp-lit paper screen: cutouts become soft shadows (holes cut with Erase let the light through) and the backdrop becomes faint scenery. Weather and water become shadows too. New scenes follow the current scene; 🖐 **Stick puppets** switches a scene back to colour. Scenes change straight from colour to shadow, without a fade.
 
 ## Templates for a whole class
 
