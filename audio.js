@@ -4,7 +4,7 @@
 const Sound = (() => {
   const SR = 32000;
   const AMBIENCE = { rain:'Rain', wind:'Wind', ocean:'Ocean waves', underwater:'Underwater', forest:'Forest birds', night:'Night crickets', fire:'Campfire' };
-  const MUSIC = { happy:'Happy', adventure:'Adventure', spooky:'Spooky', sleepy:'Sleepy', silly:'Silly', sad:'Sad', tense:'Tense' };
+  const MUSIC = { happy:'Happy', adventure:'Adventure', spooky:'Spooky', sleepy:'Sleepy', silly:'Silly', sad:'Sad', tense:'Tense', musicbox:'Music box', gongs:'Bells & gongs', lantern:'Lantern' };
 
   function rng(seed){ let s=seed>>>0; return ()=>{ s=(s+0x6D2B79F5)>>>0; let t=s; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
   function noiseLoop(len, fill, xf=SR){ // fills len+xf samples, then cross-fades the tail over the head so it loops
@@ -61,7 +61,42 @@ const Sound = (() => {
     // a pulsing low note on every beat under creeping chords, like something is about to happen
     tense:{bpm:104,chords:[[52,55,59],[52,55,60],[52,55,59],[51,54,58]],lead:[0,-1,-1,0,-1,1,-1,-1],kind:'pluck',pad:true,bass:[0,0,0,0]},
   };
-  function music(id){
+  /* ---- instruments for the three storyteller tunes (written into a looping buffer, wrapping at the end) ---- */
+  function tone(a,at,dur,midi,amp,kind){ const f=hz(midi),s0=Math.floor(at*SR),n=Math.floor(dur*SR),L=a.length,TAU=2*Math.PI/SR;
+    amp*=1.25; // level with the other music styles
+    // each partial: [frequency multiple, level, decay per second]; decays are stepped per sample (much quicker than Math.exp each time)
+    const P={box:[[1,1,2.6],[2,.45,5],[5.4,.22,11]],
+             bronze:[[1,.55,1.7],[1.006,.44,1.7],[2.76,.25,4.7],[5.4,.11,8.7]],
+             gong:[[1,.5,.55],[1.48,.27,.55],[2.03,.17,.55],[2.97,.1,.55]],
+             zither:[[1,1,3.5],[2.0014,.5,5.4],[3.0021,.33,7.3],[4.0028,.25,9.2],[5.0035,.2,11.1]],
+             block:[[880/f,1,55],[1460/f,.6,55]]}[kind]||[[1,1,4]];
+    const atk=kind==='gong'?SR*.03:40,am=kind==='gong'?2*Math.PI*2.4/SR:0;
+    for(const [m,lv,dk] of P){ const w=f*m*TAU,step=Math.exp(-dk/SR),ne=Math.min(n,Math.ceil(Math.log(Math.max(1,lv*amp/3e-4))/dk*SR)); let env=lv*amp,ph=kind==='gong'&&m===1.48?.3:0; // stop once it's too quiet to hear
+      for(let i=0;i<ne;i++){ const on=i<atk?i/atk:1; a[(s0+i)%L]+=Math.sin(ph)*env*on*(am?1+.25*Math.sin(am*i):1); ph+=w; env*=step; } } }
+  /* Music box: a slow three-beat lullaby (an original tune), like the music for a silhouette fairy tale. */
+  function musicBox(){ const beat=60/84,bars=16,L=Math.round(bars*3*beat*SR),a=new Float32Array(L),r=rng(31);
+    const C=[[60,64,67],[57,60,64],[53,57,60],[55,59,62],[60,64,67],[57,60,64],[50,53,57],[55,59,62],[60,64,67],[52,55,59],[53,57,60],[60,64,67],[50,53,57],[55,59,62],[60,64,67],[60,64,67]];
+    const M=[[76,79,84],[83,81,76],[77,81,84],[83,79,74],[76,79,84],[86,84,81],[77,81,86],[83,0,0],[84,83,84],[83,79,76],[81,84,81],[79,76,72],[74,77,81],[79,83,86],[84,0,0],[0,0,0]];
+    for(let b=0;b<bars;b++){ const t=b*3*beat,ch=C[b]; tone(a,t,3.5,ch[0],.11,'box'); tone(a,t+beat,2.4,ch[1]+12,.045,'box'); tone(a,t+beat,2.4,ch[2]+12,.04,'box'); tone(a,t+2*beat,2.4,ch[1]+12,.04,'box'); tone(a,t+2*beat,2.4,ch[2]+12,.035,'box');
+      M[b].forEach((m,k)=>{ if(m) tone(a,t+k*beat+(r()-.5)*.012,3,m,.12,'box'); }); }
+    return a; }
+  /* Bells & gongs: inspired by the gamelan that accompanies wayang kulit. A five-note scale, a core tune on every beat,
+     quicker high bells weaving around it, small gongs marking the quarters and a big gong at the end of each cycle. */
+  function bellsGongs(){ const beat=60/72,N=32,L=Math.round(N*beat*SR),a=new Float32Array(L),P={1:62,2:64,3:67,5:69,6:71,7:59};
+    const core=[3,2,3,5,6,5,3,2,1,2,3,5,3,2,7,6, 5,6,5,3,2,3,5,6,1,6,5,3,2,3,2,1];
+    core.forEach((n,i)=>{ const t=i*beat; tone(a,t,3.2,P[n]+12,.1,'bronze'); const nx=P[core[(i+1)%N]]+24; tone(a,t+beat*.5,1.6,nx,.035,'bronze'); tone(a,t+beat*.75,1.6,nx,.03,'bronze');
+      if(i%16===15) tone(a,t,9,38,.3,'gong'); else if(i%4===3) tone(a,t,4,50,.12,'gong'); });
+    return a; }
+  /* Lantern: a calm plucked tune on a zither-like string (an original tune in a five-note scale), with a soft wooden tick. */
+  function lantern(){ const beat=60/76,bars=8,L=Math.round(bars*4*beat*SR),a=new Float32Array(L),e=beat/2;
+    const M=[[76,0,79,0,81,79,76,0],[74,0,0,76,72,0,0,0],[79,0,81,0,84,81,79,0],[76,0,0,79,74,0,0,0],[81,0,84,0,86,84,81,0],[79,0,76,79,81,0,0,0],[76,74,72,0,69,0,72,0],[74,0,0,0,72,0,0,0]];
+    const B=[48,45,48,43,45,48,45,43];
+    for(let b=0;b<bars;b++){ const t=b*4*beat; tone(a,t,4,B[b],.12,'zither'); tone(a,t+2*beat,3,B[b]+7,.07,'zither');
+      M[b].forEach((m,k)=>{ if(m) tone(a,t+k*e,2.2,m,.13,'zither'); });
+      for(const k of [1,3]) tone(a,t+k*beat,.15,0,.035,'block'); if(b%2) tone(a,t+3.5*beat,.15,0,.022,'block'); }
+    return a; }
+  const GEN={musicbox:musicBox,gongs:bellsGongs,lantern};
+  function music(id){ if(GEN[id]) return GEN[id]();
     const s=SONGS[id], beatS=60/s.bpm, bars=8, L=Math.round(bars*4*beatS*SR), a=new Float32Array(L);
     for(let b=0;b<bars;b++){
       const ch=s.chords[b%s.chords.length], base=b*4;
