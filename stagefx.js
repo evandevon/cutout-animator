@@ -12,19 +12,21 @@ const StageFX=(()=>{
 
   /* ---------- shadow puppet screen ---------- */
   let screenC=null;
-  function screenTexture(W,H){ if(screenC&&screenC.width===W) return screenC; const c=mk(W,H),g=c.getContext('2d');
-    const rg=g.createRadialGradient(W*.5,H*.46,10,W*.5,H*.5,W*.72); rg.addColorStop(0,'#fff0cf'); rg.addColorStop(.45,'#f6d39a'); rg.addColorStop(.8,'#d99a55'); rg.addColorStop(1,'#a8682f'); g.fillStyle=rg; g.fillRect(0,0,W,H);
-    const r=rng(4242); // paper fibres and a faint weave
-    for(let i=0;i<2600;i++){ const x=r()*W,y=r()*H,l=4+r()*22,a=r()*Math.PI; g.strokeStyle=r()<.5?'rgba(120,70,20,.05)':'rgba(255,250,235,.07)'; g.lineWidth=.6+r()*1.1; g.beginPath(); g.moveTo(x,y); g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l); g.stroke(); }
-    g.fillStyle='rgba(110,60,20,.022)'; for(let y=0;y<H;y+=3) g.fillRect(0,y,W,1); for(let x=0;x<W;x+=3) g.fillRect(x,0,1,H);
-    // soft blotches, like thicker and thinner parts of handmade paper
-    const bw=48,bh=27,b=mk(bw,bh),bg=b.getContext('2d'),bd=bg.createImageData(bw,bh); for(let i=0;i<bw*bh;i++){ const v=r(); bd.data[i*4]=v<.5?90:255; bd.data[i*4+1]=v<.5?50:245; bd.data[i*4+2]=v<.5?15:225; bd.data[i*4+3]=Math.round(Math.abs(v-.5)*2*34); } bg.putImageData(bd,0,0);
-    g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(b,0,0,W,H);
-    // fine grain
-    const gd=g.getImageData(0,0,W,H),D=gd.data; for(let i=0;i<D.length;i+=4){ const n=(r()-.5)*16; D[i]+=n; D[i+1]+=n; D[i+2]+=n*.8; } g.putImageData(gd,0,0);
-    // a few longer fibres
-    for(let i=0;i<260;i++){ const x=r()*W,y=r()*H,a=r()*Math.PI,l=20+r()*50; g.strokeStyle=r()<.5?'rgba(110,60,20,.07)':'rgba(255,248,230,.1)'; g.lineWidth=.8; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+Math.cos(a+.6)*l/2,y+Math.sin(a+.6)*l/2,x+Math.cos(a)*l,y+Math.sin(a)*l); g.stroke(); }
-    screenC=c; return c; }
+  /* Cream paper like an old book page: soft faint blotches, little clusters of paler mottling, scattered tiny dark specks
+     and fine grain (no fibres or lines). Then lit warmly from behind by the lamp: brightest in the middle, deeper amber at the edges. */
+  function screenTexture(W,H){ if(screenC&&screenC.width===W) return screenC; const c=mk(W,H),g=c.getContext('2d'),r=rng(4242);
+    g.fillStyle='rgb(248,231,210)'; g.fillRect(0,0,W,H);
+    const bw=22,bh=13,b=mk(bw,bh),bg=b.getContext('2d'),bd=bg.createImageData(bw,bh); // large soft blotches, very faint
+    for(let i=0;i<bw*bh;i++){ const v=r(),lt=v>.5; bd.data[i*4]=lt?255:200; bd.data[i*4+1]=lt?252:170; bd.data[i*4+2]=lt?245:130; bd.data[i*4+3]=Math.round(Math.abs(v-.5)*2*30); }
+    bg.putImageData(bd,0,0); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(b,0,0,W,H);
+    for(let k=0;k<420;k++){ const cx=r()*W,cy=r()*H,n=4+r()*12,sp=4+r()*14; g.fillStyle=`rgba(255,251,242,${.25+r()*.3})`; // pale mottled flecks, in little clusters
+      for(let i=0;i<n;i++){ const s=.7+r()*2.2; g.beginPath(); g.ellipse(cx+(r()-.5)*sp*2,cy+(r()-.5)*sp,s,s*(.5+r()*.6),r()*3,0,7); g.fill(); } }
+    for(let k=0;k<520;k++){ const s=.35+Math.pow(r(),3)*1.4; g.fillStyle=`rgba(${110+r()*40|0},${80+r()*30|0},${50+r()*25|0},${.25+r()*.45})`; g.beginPath(); g.arc(r()*W,r()*H,s,0,7); g.fill(); } // tiny dark specks
+    for(let k=0;k<3;k++){ const x=r()*W,y=r()*H; for(let i=0;i<8;i++){ g.fillStyle='rgba(170,120,60,.18)'; g.beginPath(); g.arc(x+(r()-.5)*7,y+(r()-.5)*7,.8+r()*1.6,0,7); g.fill(); } } // a couple of small foxing marks
+    const gd=g.getImageData(0,0,W,H),D=gd.data; for(let i=0;i<D.length;i+=4){ const n=(r()-.5)*7; D[i]+=n; D[i+1]+=n; D[i+2]+=n*.9; } g.putImageData(gd,0,0); // fine grain
+    g.globalCompositeOperation='multiply'; const rg=g.createRadialGradient(W*.5,H*.46,10,W*.5,H*.5,W*.72); // lamplight from behind
+    rg.addColorStop(0,'rgb(255,250,236)'); rg.addColorStop(.45,'rgb(252,226,180)'); rg.addColorStop(.8,'rgb(232,178,112)'); rg.addColorStop(1,'rgb(190,128,70)'); g.fillStyle=rg; g.fillRect(0,0,W,H);
+    g.globalCompositeOperation='source-over'; screenC=c; return c; }
   // The backdrop as faint scenery painted on the screen: darker parts of the drawing become darker shadow.
   const sceneryCache=new Map();
   function scenery(key,W,H,draw){ let c=sceneryCache.get(key); if(c) return c; const w=Math.round(W/2),h=Math.round(H/2); c=mk(w,h); const g=c.getContext('2d',{willReadFrequently:true}); g.scale(.5,.5); const ready=draw(g)!==false;
