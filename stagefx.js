@@ -25,7 +25,9 @@ const StageFX=(()=>{
     for(let k=0;k<3;k++){ const x=r()*W,y=r()*H; for(let i=0;i<8;i++){ g.fillStyle='rgba(170,120,60,.18)'; g.beginPath(); g.arc(x+(r()-.5)*7,y+(r()-.5)*7,.8+r()*1.6,0,7); g.fill(); } } // a couple of small foxing marks
     const gd=g.getImageData(0,0,W,H),D=gd.data; for(let i=0;i<D.length;i+=4){ const n=(r()-.5)*7; D[i]+=n; D[i+1]+=n; D[i+2]+=n*.9; } g.putImageData(gd,0,0); // fine grain
     g.globalCompositeOperation='multiply'; const rg=g.createRadialGradient(W*.5,H*.46,10,W*.5,H*.5,W*.72); // lamplight from behind
-    rg.addColorStop(0,'rgb(255,250,236)'); rg.addColorStop(.45,'rgb(252,226,180)'); rg.addColorStop(.8,'rgb(232,178,112)'); rg.addColorStop(1,'rgb(190,128,70)'); g.fillStyle=rg; g.fillRect(0,0,W,H);
+    rg.addColorStop(0,'rgb(255,252,244)'); rg.addColorStop(.3,'rgb(253,232,196)'); rg.addColorStop(.62,'rgb(228,166,98)'); rg.addColorStop(1,'rgb(150,92,44)'); g.fillStyle=rg; g.fillRect(0,0,W,H);
+    g.globalCompositeOperation='screen'; const hot=g.createRadialGradient(W*.5,H*.45,0,W*.5,H*.47,W*.34); // the hot spot where the lamp shines through
+    hot.addColorStop(0,'rgba(255,246,226,.55)'); hot.addColorStop(.5,'rgba(255,236,200,.22)'); hot.addColorStop(1,'rgba(255,236,200,0)'); g.fillStyle=hot; g.fillRect(0,0,W,H);
     g.globalCompositeOperation='source-over'; screenC=c; return c; }
   // The backdrop as faint scenery painted on the screen: darker parts of the drawing become darker shadow.
   const sceneryCache=new Map();
@@ -37,7 +39,12 @@ const StageFX=(()=>{
     if(!S){ S=mk(W,H); const g=S.getContext('2d'); g.drawImage(screenTexture(W,H),0,0); let ready=true; if(drawBack){ const sc=scenery(key,W,H,d=>{ const r=drawBack(d); ready=r!==false; return r; }); g.drawImage(sc,0,0,W,H); }
       if(ready){ if(screenCache.size>12) screenCache.clear(); screenCache.set(key,S); } }
     c.drawImage(S,0,0,W,H);
-    const q=stepT(t),f=.018+.014*Math.sin(q*7.3)*Math.sin(q*2.1+1); c.fillStyle=`rgba(60,30,5,${Math.max(0,f)})`; c.fillRect(0,0,W,H); } // a lamp flickers very slightly
+    /* A lamp behind the screen, flickering very slightly like a flame: the bright centre swells and fades a little, unevenly,
+       and drifts a few pixels. Worked out from the scene time, so the video matches what was seen. */
+    const n=Math.sin(t*5.3)*.5+Math.sin(t*8.9+1.3)*.3+Math.sin(t*13.7+2.1)*.2,k=.5+.5*n,dx=Math.sin(t*1.7)*5+Math.sin(t*4.1)*2,dy=Math.sin(t*2.3+.7)*3;
+    c.save(); c.globalCompositeOperation='screen'; const g=c.createRadialGradient(W*.5+dx,H*.45+dy,0,W*.5+dx,H*.47+dy,W*.3);
+    g.addColorStop(0,`rgba(255,240,210,${.04+.07*k})`); g.addColorStop(1,'rgba(255,240,210,0)'); c.fillStyle=g; c.fillRect(0,0,W,H);
+    c.globalCompositeOperation='multiply'; c.fillStyle=`rgba(235,215,190,${.06*(1-k)})`; c.fillRect(0,0,W,H); c.restore(); }
   const sils=new WeakMap();
   function silhouette(im){ let S=sils.get(im); if(S) return S; const w=im.naturalWidth,h=im.naturalHeight; if(!w||!h||!im.complete) return null; const b=Math.max(1.5,Math.max(w,h)*.006),pad=Math.ceil(b*3);
     const sh=mk(w,h),sg=sh.getContext('2d'); sg.drawImage(im,0,0); sg.globalCompositeOperation='source-in'; sg.fillStyle=INK; sg.fillRect(0,0,w,h);
