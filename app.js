@@ -66,11 +66,11 @@ async function keepSource(a,info){ if(!info||!info.src) return; try{ const c=inf
 async function editCutout(id){ if(mode!=='setup') return; const a=project.assets[id]; if(!a) return; const im=await loadImg(a),S=a.src&&project.assets[a.src.id]; let c=document.createElement('canvas'),box,gain=1;
   if(S){ const u=URL.createObjectURL(S.blob),si=new Image(); try{ si.src=u; await si.decode(); } finally{ URL.revokeObjectURL(u); } c.width=si.naturalWidth; c.height=si.naturalHeight; c.getContext('2d').drawImage(si,0,0); box=a.src.box; gain=a.src.gain||1; }
   else { c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); box=[0,0,c.width,c.height]; } // no photo kept (older or library cutouts): it can be trimmed, and what's trimmed can be added back later
-  Cut.edit(c,cut=>applyFix(a,cut,box),null,{mask:im,box,gain}); }
+  Cut.edit(c,cut=>applyFix(a,cut,box),null,{mask:im,box,gain,opacity:a.opacity??1}); }
 /* Swap in the fixed cutout everywhere it's used, without anything jumping: the picture may have grown or shrunk,
    so each copy is moved and resized to keep the drawing exactly where it was, in every recorded frame too. */
 async function applyFix(a,cut,box0){ checkpoint(); const ob=box0.map(v=>v*cut.k),nb=cut.box,im=imgs.get(a.id),ow=im?im.naturalWidth:a.w;
-  const b=addAsset('cutout',cut.blob,a.name,cut.w,cut.h); if(a.mine) b.mine=a.mine; await keepSource(b,cut); await loadImg(b);
+  const b=addAsset('cutout',cut.blob,a.name,cut.w,cut.h); if(a.mine) b.mine=a.mine; if(cut.opacity<.999) b.opacity=Math.round(cut.opacity*100)/100; await keepSource(b,cut); await loadImg(b);
   const rOld=ow/ob[2],rNew=cut.w/nb[2],rho=rOld/rNew,dx=((nb[0]+nb[2]/2)-(ob[0]+ob[2]/2))*rOld,dy=((nb[1]+nb[3]/2)-(ob[1]+ob[3]/2))*rOld;
   const move=q=>{ const t=(q.r||0)+(q.tilt||0),fl=q.flip?-1:1,ox=fl*q.s*dx,oy=q.s*dy; q.x+=ox*Math.cos(t)-oy*Math.sin(t); q.y+=ox*Math.sin(t)+oy*Math.cos(t); q.s*=rho; };
   const moveF=f=>{ const q={x:f[1],y:f[2],s:f[3],r:f[4],flip:!!f[5],tilt:f[6]||0}; move(q); f[1]=r3(q.x); f[2]=r3(q.y); f[3]=r3(q.s); };
@@ -136,7 +136,9 @@ function sceneMats(scene,poseOf,t,anim=true,wob=null){ const by=new Map(scene.it
   const get=(it,depth)=>{ let r=out.get(it.id); if(r) return r; const im=imgs.get(it.assetId),p=poseOf(it),par=it.link&&depth<16?by.get(it.link):null,P=par?get(par,depth+1).m:I6;
     r={it,p,P,im,m:mmul(P,localMat(it,p,im,anim?t:null,wob&&anim?wob(it):null))}; out.set(it.id,r); return r; };
   for(const it of scene.items) get(it,0); return out; }
-function drawWith(c,e){ if(!e||!e.im) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]);
+/* See-through cutouts (ghosts, windows, a house you can see inside): set with the 👻 slider when cutting out or fixing. */
+const opacityOf=it=>{ const a=it&&project.assets[it.assetId]; return a&&a.opacity!=null?a.opacity:1; };
+function drawWith(c,e){ if(!e||!e.im) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.globalAlpha*=opacityOf(e.it); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]);
   const E=e.it&&e.it.edge?paperEdge(e.im):null; if(E) c.drawImage(E.c,-w/2-E.pad,-h/2-E.pad); else c.drawImage(e.im,-w/2,-h/2,w,h); c.restore(); }
 /* "Paper edge": a rough white border, as if the drawing was cut out with scissors a little way outside the lines,
    with a soft shadow so it looks like paper sitting on the backdrop. Made once per picture and kept. */
@@ -164,12 +166,12 @@ function shadowOf(im){ let S=shades.get(im); if(S) return S; const w=im.naturalW
   const b=clamp(Math.max(w,h)*.018,3,22),pad=Math.ceil(b*2.5),c=document.createElement('canvas'); c.width=w+2*pad; c.height=h+2*pad; const g=c.getContext('2d'),far=c.width+w+50;
   g.shadowColor='rgba(25,15,5,.38)'; g.shadowBlur=b; g.shadowOffsetX=far; g.drawImage(im,pad-far,pad,w,h); S={c,pad}; shades.set(im,S); return S; }
 function drawShadow(c,e){ if(!e||!e.im||(e.it&&e.it.edge)) return; const S=shadowOf(e.im); if(!S) return; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight,size=Math.max(w,h)*Math.sqrt(Math.abs(mdet(m))),pin=e.it&&e.it.fixed,d=(5+6*Math.min(1,size/500))*(pin?.5:1);
-  c.save(); c.globalAlpha=pin?.6:1; c.translate(d*.65,d); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); }
+  c.save(); c.globalAlpha=(pin?.6:1)*opacityOf(e.it); c.translate(d*.65,d); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); }
 function cornersOf(e){ if(!e||!e.im) return null; const w=e.im.naturalWidth/2,h=e.im.naturalHeight/2,A=(x,y)=>mapp(e.m,x,y); return {tl:A(-w,-h),tr:A(w,-h),br:A(w,h),bl:A(-w,h)}; }
 function drawScene(c,scene,poseOf,t=0,mats,o={}){ mats=mats||sceneMats(scene,poseOf,t,true,o.wob); c.save(); c.beginPath(); c.rect(0,0,W,H); c.clip(); const sp=!!scene.shadow;
   if(sp){ // shadow puppets: a lamp-lit screen, faint scenery, and the cutouts as soft-edged shadows
     const b=scene.backdrop; StageFX.screen(c,W,H,t,JSON.stringify(b),g=>{ drawBackdrop(g,b); return b.type!=='asset'||!!imgs.get(b.id); });
-    for(const it of scene.items){ const e=mats.get(it.id); if(!e||!e.im) continue; const S=StageFX.silhouette(e.im); if(!S) continue; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); } }
+    for(const it of scene.items){ const e=mats.get(it.id); if(!e||!e.im) continue; const S=StageFX.silhouette(e.im); if(!S) continue; const m=e.m,w=e.im.naturalWidth,h=e.im.naturalHeight; c.save(); c.globalAlpha*=opacityOf(it); c.transform(m[0],m[1],m[2],m[3],m[4],m[5]); c.drawImage(S.c,-w/2-S.pad,-h/2-S.pad); c.restore(); } }
   else { drawBackdrop(c,scene.backdrop); const sh=shadowsOn(); for(const it of scene.items){ const e=mats.get(it.id); if(sh) drawShadow(c,e); drawWith(c,e); } }
   StageFX.water(c,W,H,scene.sea,t,sp);
   if(o.wx) Weather.draw(c,scene.wx,o.wx.events,o.wx.t,W,H,sp,o.wx.dens||1);
@@ -562,6 +564,7 @@ function tick(now){
 /* ---------- UI lists ---------- */
 function thumbURL(a){ return a.__u||(a.__u=URL.createObjectURL(a.blob)); }
 function renderCast(){ const box=$('castList'); box.innerHTML=''; for(const id of project.cast){ const a=project.assets[id]; if(!a) continue; const b=document.createElement('button'); b.className='thumb'; b.setAttribute('aria-label','Put '+(a.name||'cutout')+' on stage'); const im=new Image(); im.src=thumbURL(a); im.alt=''; b.append(im);
+    if(a.opacity!=null&&a.opacity<1){ im.style.opacity=Math.max(.3,a.opacity); const g=document.createElement('span'); g.className='ghost'; g.textContent='👻'; g.title=Math.round((1-a.opacity)*100)+'% see-through'; b.append(g); b.setAttribute('aria-label',b.getAttribute('aria-label')+', '+g.title); }
     const x=document.createElement('span'); x.className='x'; x.textContent='×'; x.setAttribute('role','button'); x.setAttribute('aria-label','Delete cutout'); x.onclick=async ev=>{ ev.stopPropagation(); const used=project.scenes.some(s=>s.items.some(i=>i.assetId===id)); if(used&&!await ask('Remove this cutout?','It will disappear from every scene that uses it.',[['Keep it',null],['Remove',1,'danger']])) return; checkpoint(); project.cast=project.cast.filter(c=>c!==id); project.scenes.forEach(s=>{ const gone=s.items.filter(i=>i.assetId===id).map(i=>i.id); unstickFrom(s,gone); s.items=s.items.filter(i=>i.assetId!==id); if(s.take) gone.forEach(g=>delete s.take.tracks[g]); }); selId=null; refreshAll(); dirty(); }; b.append(x);
     const ed=document.createElement('span'); ed.className='ed'; ed.textContent='✏️'; ed.title='Fix this cutout'; ed.setAttribute('role','button'); ed.tabIndex=0; ed.setAttribute('aria-label','Fix '+(a.name||'cutout')); ed.onclick=ev=>{ ev.stopPropagation(); editCutout(id); }; ed.onkeydown=ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); ev.stopPropagation(); editCutout(id); } }; b.append(ed);
     b.onclick=()=>{ if(mode!=='setup') return; checkpoint(); placeCutout(a); updateItemBar(); refreshHint(); dirty(); }; box.append(b); } refreshHint(); }
@@ -668,7 +671,7 @@ function saveDownload(blob,name){ const a=document.createElement('a'); a.href=UR
 function usedAssets(){ const u=new Set([...project.cast,...project.backdrops]); const ref=r=>{ if(r&&r.startsWith('asset:')) u.add(r.slice(6)); }; project.pads.forEach(ref);
   for(const s of project.scenes){ if(s.backdrop.type==='asset') u.add(s.backdrop.id); ref(s.ambience); ref(s.music); s.items.forEach(i=>u.add(i.assetId)); if(s.script) u.add(s.script); if(s.take){ (s.take.voices||[]).forEach(v=>u.add(v.assetId)); (s.take.fx||[]).forEach(f=>ref(f.ref)); } } for(const id of [...u]){ const a=project.assets[id]; if(a&&a.src) u.add(a.src.id); } return u; }
 async function saveProject(){ toast('Saving…',60000); const z=new JSZip(),meta={},used=usedAssets();
-  for(const id of used){ const a=project.assets[id]; if(!a) continue; const file='assets/'+id+'.'+extOf(a.blob); z.file(file,a.blob); meta[id]={id,mine:a.mine,libId:a.libId,kind:a.kind,name:a.name,w:a.w,h:a.h,file,type:a.blob.type,libPath:a.libPath,userSound:a.userSound,src:a.src}; }
+  for(const id of used){ const a=project.assets[id]; if(!a) continue; const file='assets/'+id+'.'+extOf(a.blob); z.file(file,a.blob); meta[id]={id,mine:a.mine,libId:a.libId,kind:a.kind,name:a.name,w:a.w,h:a.h,file,type:a.blob.type,libPath:a.libPath,userSound:a.userSound,src:a.src,opacity:a.opacity}; }
   const {assets,...rest}=project; z.file('project.json',JSON.stringify({app:'cutout-animator',...rest,assets:meta}));
   const blob=await z.generateAsync({type:'blob',compression:'STORE'}); const d=new Date(),st=d.toISOString().slice(0,10)+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
   saveDownload(blob,safeName()+'_'+st+'.cutz'); toast('Project saved to your downloads. Open it here any time to keep editing.'); }
@@ -833,7 +836,7 @@ function wire(){
   document.addEventListener('dragstart',e=>{ if(e.target.tagName==='IMG'||e.target.tagName==='CANVAS') e.preventDefault(); });
   document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; document.querySelectorAll('.tabs button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-selected',x===b); }); stopLibPreview(); for(const t of ['cast','back','sound']) $('tab-'+t).hidden=t!==tab; if(tab==='sound') renderLibrary(); });
   Cut.init({toast,
-    onCutout:async(blob,w,h,info)=>{ checkpoint(); const n=project.cast.length+1,a=addAsset('cutout',blob,'Cutout '+n,w,h); await keepSource(a,info); await loadImg(a); project.cast.push(a.id); placeCutout(a); renderCast(); updateItemBar(); dirty(); },
+    onCutout:async(blob,w,h,info)=>{ checkpoint(); const n=project.cast.length+1,a=addAsset('cutout',blob,'Cutout '+n,w,h); if(info&&info.opacity<.999) a.opacity=Math.round(info.opacity*100)/100; await keepSource(a,info); await loadImg(a); project.cast.push(a.id); placeCutout(a); renderCast(); updateItemBar(); dirty(); },
     onBackdrop:async(blob,w,h)=>{ checkpoint(); const a=addAsset('backdrop',blob,'Photo '+(project.backdrops.length+1),w,h); await loadImg(a); project.backdrops.push(a.id); cur().backdrop={type:'asset',id:a.id}; renderBack(); dirty(); }});
   Template.init({toast,onAdd:importSheets});
   Library.init({onPick:async item=>{ checkpoint(); let a=Object.values(project.assets).find(x=>x.libId===item.id&&x.kind==='cutout'); if(!a){ const c=await Library.toCutout(item); a=addAsset('cutout',c.blob,item.name,c.w,c.h); a.libId=item.id; await loadImg(a); } if(!project.cast.includes(a.id)) project.cast.push(a.id); const it=placeCutout(a); it.anim=item.alive?'sway':null; if(item.scenery) it.fixed=true; updateItemBar(); renderCast(); updateItemBar(); dirty(); toast(item.name+' added to the stage.',1500); }});

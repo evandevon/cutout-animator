@@ -85,6 +85,8 @@ const Cut = (() => {
 
   const maskCv=document.createElement('canvas');
   let hover=null;
+  const see=()=>+$('seeThru').value||0;
+  function setSee(v){ $('seeThru').value=v; $('seeVal').textContent=v+'%'; }
   function draw(rebuild=true){
     if(!src) return;
     fit();
@@ -94,7 +96,7 @@ const Cut = (() => {
     cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cv.width,cv.height);
     const sq=Math.ceil(12*view.dpr); for(let y=0;y<cv.height;y+=sq)for(let x=0;x<cv.width;x+=sq){ cx.fillStyle=((x+y)/sq)%2?'#cfe8e8':'#fff'; cx.fillRect(x,y,sq,sq); }
     cx.globalAlpha=.38; cx.drawImage(src,0,0,cv.width,cv.height); cx.globalAlpha=1; // faint original, so you can see what Add will bring back
-    cx.drawImage(maskCv,0,0,cv.width,cv.height);
+    cx.globalAlpha=1-see()/100; cx.drawImage(maskCv,0,0,cv.width,cv.height); cx.globalAlpha=1; // shown as see-through as it will be
     if(stroke&&tool==='lasso'&&stroke.pts.length>1){ cx.beginPath(); stroke.pts.forEach((p,i)=>{ const X=p[0]*view.k,Y=p[1]*view.k; i?cx.lineTo(X,Y):cx.moveTo(X,Y); }); cx.strokeStyle='#e0301e'; cx.lineWidth=3*view.dpr; cx.setLineDash([10*view.dpr,6*view.dpr]); cx.stroke(); cx.setLineDash([]); }
     if(hover&&(tool==='erase'||tool==='restore')){ const R=+$('brush').value/2*view.dpr,X=hover[0]*view.k,Y=hover[1]*view.k; cx.beginPath(); cx.arc(X,Y,R,0,7); cx.lineWidth=3*view.dpr; cx.strokeStyle='#fff'; cx.stroke(); cx.lineWidth=1.5*view.dpr; cx.strokeStyle=tool==='erase'?'#e0301e':'#0b6e6e'; cx.setLineDash([5*view.dpr,4*view.dpr]); cx.stroke(); cx.setLineDash([]); }
   }
@@ -169,7 +171,7 @@ const Cut = (() => {
     x.putImageData(d,0,0); const blob=await new Promise(r=>c.toBlob(r,'image/png')); return {blob,w:cw,h:ch,outside,box:[x0,y0,cw,ch],gain:g};
   }
   let fixDone=null;
-  function editBox(canvas,done,rect,init){ fixDone=done; editRect=rect||null; initFix=init||null; mode='cutout'; $('capTitle').textContent='Fix this cutout'; $('capDlg').showModal(); setImage(canvas,canvas.width,canvas.height); $('cutBackdrop').hidden=$('cutAnother').hidden=$('cutRetake').hidden=true; $('cutDone').textContent='✓ Use this cutout'; }
+  function editBox(canvas,done,rect,init){ fixDone=done; editRect=rect||null; initFix=init||null; mode='cutout'; setSee(Math.round((1-(init&&init.opacity!=null?init.opacity:1))*100)); $('seeWrap').hidden=false; $('capTitle').textContent='Fix this cutout'; $('capDlg').showModal(); setImage(canvas,canvas.width,canvas.height); $('cutBackdrop').hidden=$('cutAnother').hidden=$('cutRetake').hidden=true; $('cutDone').textContent='✓ Use this cutout'; }
 
   async function finish(another){
     let x0=W,y0=H,x1=-1,y1=-1; const k=new Uint8Array(W*H);
@@ -185,10 +187,10 @@ const Cut = (() => {
     if(z<1){ out=document.createElement('canvas'); out.width=Math.round(cw*z); out.height=Math.round(ch*z); const o=out.getContext('2d'); o.imageSmoothingQuality='high'; o.drawImage(c,0,0,out.width,out.height); }
     const blob=await new Promise(r=>out.toBlob(r,'image/png'));
     const box=[x0,y0,cw,ch];
-    if(fixDone){ const f=fixDone; f({blob,w:out.width,h:out.height,box,k:scaleK,src,gain:whiteGain,png:hasAlpha}); close(); return; }
+    if(fixDone){ const f=fixDone; f({blob,w:out.width,h:out.height,box,k:scaleK,src,gain:whiteGain,png:hasAlpha,opacity:1-see()/100}); close(); return; }
     // Keep the part of the photo around the cutout, so it can be fixed later (Add needs the original picture).
     const m=Math.round(Math.max(cw,ch)*.15)+24,sx=Math.max(0,x0-m),sy=Math.max(0,y0-m),sc=document.createElement('canvas'); sc.width=Math.min(W,x1+1+m)-sx; sc.height=Math.min(H,y1+1+m)-sy; sc.getContext('2d').drawImage(src,-sx,-sy);
-    await onCutout(blob,out.width,out.height,{src:sc,box:[x0-sx,y0-sy,cw,ch],gain:whiteGain,png:hasAlpha});
+    await onCutout(blob,out.width,out.height,{src:sc,box:[x0-sx,y0-sy,cw,ch],gain:whiteGain,png:hasAlpha,opacity:1-see()/100});
     if(another){
       // Blank out what was just taken, so the next cut is whatever else is on the page.
       pushUndo(); for(let i=0;i<W*H;i++) if(k[i]) edit[i]=-1; draw();
@@ -215,7 +217,7 @@ const Cut = (() => {
   }
   function stopCam(){ if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; $('camVideo').srcObject=null; }
   function showSource(){ src=null; $('capCut').hidden=true; $('capSource').hidden=false; startCam(); }
-  function open(m){ mode=m; $('capTitle').textContent=m==='backdrop'?'Add a backdrop':'Add a drawing'; $('capDlg').showModal(); showSource(); }
+  function open(m){ mode=m; setSee(0); $('seeWrap').hidden=m==='backdrop'; $('capTitle').textContent=m==='backdrop'?'Add a backdrop':'Add a drawing'; $('capDlg').showModal(); showSource(); }
   function close(){ stopCam(); src=null; fixDone=null; editRect=null; initFix=null; $('cutBackdrop').hidden=$('cutRetake').hidden=false; $('cutDone').textContent='✓ Add to stage'; $('capDlg').close(); }
 
   function init(o){
@@ -228,7 +230,7 @@ const Cut = (() => {
     $('pasteImg').onclick=async()=>{ try{ for(const it of await navigator.clipboard.read()){ const t=it.types.find(x=>x.startsWith('image/')); if(t){ fromBlob(await it.getType(t)); return; } } toast('No picture on the clipboard.'); }catch(_){ toast('Press Ctrl+V (or Cmd+V) to paste instead.'); } };
     window.addEventListener('paste',e=>{ if(!$('capDlg').open) return; for(const it of e.clipboardData.items) if(it.type.startsWith('image/')){ fromBlob(it.getAsFile()); e.preventDefault(); return; } });
     let t; const reauto=()=>{ initFix=null; recompute(); },deb=()=>{ clearTimeout(t); t=setTimeout(reauto,60); };
-    $('thresh').oninput=deb; $('autoPaper').onchange=reauto; $('keepHoles').onchange=reauto;
+    $('thresh').oninput=deb; $('seeThru').oninput=()=>{ $('seeVal').textContent=see()+'%'; draw(false); }; $('autoPaper').onchange=reauto; $('keepHoles').onchange=reauto;
     document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ tool=b.dataset.tool; document.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); });
     $('cutUndo').onclick=()=>{ if(undo.length){ edit=undo.pop(); draw(); } };
     $('cutReset').onclick=()=>{ pushUndo(); edit.fill(0); draw(); };
