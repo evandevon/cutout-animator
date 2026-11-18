@@ -22,7 +22,7 @@ const Template=(()=>{
       anim:{dy:36.5,s:4.5,dx:[0,12.75,25.5,38.25]},amb:list(178,128,8.5,5.5,7),mus:list(216,128,8.5,5.5,7),notes:[{x:245,y:127,w:42,h:61}]},
     cast:{kind:'cast',chars:grid(6,3,10,30,95.5,83,86,52),anim:{dy:53.5,s:4.5,dx:[0,21.5,43,64.5]},notes:grid(6,3,10,89,95.5,83,86,18)}, // notes: each character's name and description lines (read by the teacher, not scanned)
     orientation:{...STAGE,stage:'orientation'},complication:{...STAGE,stage:'complication'},resolution:{...STAGE,stage:'resolution'},
-    next:{...STAGE,stage:'next',part:list(0,122,0,5.5,4).map((b,i)=>({...b,x:196+i*21}))}};
+    next:{...STAGE,stage:'next'}}; // What happens next pages go in the order they were scanned
   const CODES={'1100':'scene','1000':'cast','0100':'orientation','0010':'complication','0110':'next','0001':'resolution','0000':'old'};
   /* Blank paper between the boxes, used to measure the lighting across the page so shadows and warm light can be evened out. */
   function paperOf(lay){ const out=[],r=[],add=(b,m=2.5)=>r.push([b.x-m,b.y-m-4,b.x+(b.w||b.s)+m,b.y+(b.h||b.s)+m]);
@@ -109,7 +109,6 @@ const Template=(()=>{
     if(lay.script){ const c=warp(src,sw,sh,H,inset(lay.script),9,light); sheet.script=inked(c,P)>.003?c:null; }
     if(lay.amb){ sheet.amb=pickOne(lay.amb,AMB); sheet.mus=pickOne(lay.mus,MUS); }
     if(lay.who) sheet.who=lay.who.map((b,i)=>tick(b)?i:-1).filter(i=>i>=0);
-    if(lay.part){ const k=lay.part.findIndex(tick); sheet.part=k<0?null:k+1; }
     for(const [n,b] of (lay.chars||[]).entries()){
       // Look a little past the box, in case the drawing goes over its edge.
       const pm=PX_MM*1.4,M=8,big={x:Math.max(3,b.x-M),y:Math.max(3,b.y-M),w:0,h:0}; big.w=Math.min(294,b.x+b.w+M)-big.x; big.h=Math.min(207,b.y+b.h+M)-big.y;
@@ -150,7 +149,7 @@ const Template=(()=>{
   const labelOf=(list,r)=>(list.find(x=>x[0]===r)||[])[1];
   function renderRow(s){
     const row=document.createElement('div'); row.className='tplRow'+(s.error?' bad':''); s.row=row;
-    const head=document.createElement('div'); head.className='tplHead'; const b=document.createElement('b'); b.textContent=s.error?s.error:(s.kind==='cast'?'🎭 Cast page':s.kind==='stage'?'📖 '+stageName(s.stage)+(s.part?' '+s.part:''):'🎬 Scene sheet')+' · '+s.name; head.append(b);
+    const head=document.createElement('div'); head.className='tplHead'; const b=document.createElement('b'); b.textContent=s.error?s.error:(s.kind==='cast'?'🎭 Cast page':s.kind==='stage'?'📖 '+stageName(s.stage):'🎬 Scene sheet')+' · '+s.name; head.append(b);
     const del=document.createElement('button'); del.className='small'; del.textContent='✕'; del.setAttribute('aria-label','Remove this sheet'); del.onclick=()=>{ sheets=sheets.filter(x=>x!==s); row.remove(); count(); }; head.append(del); row.append(head);
     if(s.error){ const p=document.createElement('p'); p.className='hint'; p.textContent=s.name+'. Make sure all four corner squares and the page code at the bottom are in the picture, then try again.'; row.append(p); $('tplRows').append(row); return; }
     const w=document.createElement('div'); w.className='tplThumbs';

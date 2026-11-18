@@ -20,7 +20,8 @@ STAGES=[('orientation','Orientation','Who is in the story? Where are they? When 
            ['Introduce the characters.','Show where and when it happens.','Start calm: try Happy or Sleepy music.']),
         ('complication','Complication','What goes wrong? How do the characters feel?',
            ['Something goes wrong.','Show how the characters feel.','Try Tense, Sad or Spooky music.']),
-        ('next','What happens next','What do they try? Does it work? What happens then?',None),
+        ('next','What happens next','What do they try? Does it work? What happens then?',
+           ['Show what the characters try next.','Does it work, or make things worse?','Scan these pages in story order.']),
         ('resolution','Resolution','How is the problem solved? How have things changed?',
            ['Solve the problem, or try to.','Show how things have changed.','Happy music helps it finish well.'])]
 
@@ -101,13 +102,8 @@ def stage_page(s,k):
     s.text(196,27.8,'Who is in this scene?',8.5,True)
     for i in range(6): s.tick(196+(i%3)*12,30+(i//3)*8,str(i+1),5.5,9)
     s.lists(196,62,43,7.5,5.5,9)
-    if key=='next':
-        s.text(196,119.5,'Which "What happens next" page is this?',8.5,True)
-        for i in range(4): s.tick(196+i*21,122,str(i+1),5.5,10)
-        s.text(196,133.5,'Print as many as the story needs. Tick 1 on the first.',7,col=HINT)
-    else:
-        s.text(196,119.5,'Tips',8.5,True)
-        for i,t in enumerate(tips): s.text(196,124.5+i*4.4,'• '+t,7.5,col=HINT)
+    s.text(196,119.5,'Tips',8.5,True)
+    for i,t in enumerate(tips): s.text(196,124.5+i*4.4,'• '+t,7.5,col=HINT)
     s.text(196,141,'Sounds in this scene',8.5,True); s.rect(196,142.2,91,44.8)
     s.text(198,147.5,'Background sounds',8,True); s.text(229,147.5,'(like birds, traffic, a crowd)',6.5,col=HINT)
     for i in range(2): s.line(199,154.5+i*6.5,284,154.5+i*6.5)

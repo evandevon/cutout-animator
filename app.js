@@ -801,7 +801,7 @@ function sfxWire(){ const cv=$('sfxWave'); let drag=null; const tAt=e=>{ const r
 
 /* ---------- template sheets ---------- */
 /* Scanned sheets become scenes. A scene sheet is one scene. Story pages come as a cast page (6 characters, drawn once)
-   followed by its stage pages, which are put in story order: Orientation, Complication, What happens next 1, 2, 3…, Resolution.
+   followed by its stage pages, which are put in story order: Orientation, Complication, What happens next (in the order scanned), Resolution.
    Each stage page places the characters ticked under "Who is in this scene?" (everyone if none are ticked). */
 const STAGE_ORDER=['orientation','complication','next','resolution'],STAGE_NAMES={orientation:'Orientation',complication:'Complication',next:'What happens next',resolution:'Resolution'};
 async function importSheets(sheets){ checkpoint();
@@ -820,7 +820,7 @@ async function importSheets(sheets){ checkpoint();
   for(const g of groups){
     if(g.single){ const sh=g.single,n=await sceneFrom(sh),list=[]; for(const ch of sh.chars) list.push({a:await cutoutOf(ch),anim:ch.anim}); place(n,list); added.push(n); continue; }
     const cast=[]; if(g.cast) for(const ch of g.cast.chars) cast[ch.n]={a:await cutoutOf(ch),anim:ch.anim}; else noCast++;
-    const key=sh=>STAGE_ORDER.indexOf(sh.stage)*1000+(sh.stage==='next'?(sh.part||9)*100:0)+sh.__i;
+    const key=sh=>STAGE_ORDER.indexOf(sh.stage)*1000+sh.__i; // stages in story order; pages of the same stage in the order they were scanned
     for(const sh of g.pages.slice().sort((x,y)=>key(x)-key(y))){ const n=await sceneFrom(sh),who=sh.who&&sh.who.length?sh.who:cast.map((_,i)=>i); place(n,who.map(i=>cast[i]).filter(Boolean)); added.push(n); } }
   if(!added.length){ refreshAll(); dirty(); toast('Characters added to the Cutouts list.'); return; }
   project.scenes=blank?added:project.scenes.concat(added); curId=added[0].id; selId=null; refreshAll(); showCurrentScene(); dirty();
