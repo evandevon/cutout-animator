@@ -122,5 +122,5 @@ def make(path,title,pages):
     c.save()
 
 make('templates/cutout-template-A4.pdf','Cutout Animator scene template',[scene_sheet])
-make('templates/story-template-A4.pdf','Cutout Animator story template',[cast_page]+[(lambda s,k=k:stage_page(s,k)) for k in range(4)])
+make('templates/story-template-A4.pdf','Cutout Animator story template',[cast_page]+[(lambda s,k=k:stage_page(s,k)) for k in (0,1,2,2,3)])  # two What happens next pages by default
 print('ok')
