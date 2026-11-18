@@ -46,8 +46,10 @@ class Sheet:
             s.c.rect((CODE_X+i*CODE_P)*mm,s.Y(CODE_Y+CODE_S),CODE_S*mm,CODE_S*mm,stroke=1,fill=1)
     def tick(s,x,y,label,size,fs):
         s.rect(x,y,size,size,.7); s.text(x+size+1.5,y+size-1,label,fs)
-    def char(s,x,y,w,h,i,fs=8.5,afs=7.5):
-        s.text(x,y-1.2,f'Character {i+1}',fs,True); s.text(x+w,y-1.2,'name: ____________',7,col=HINT,align='r'); s.rect(x,y,w,h)
+    def char(s,x,y,w,h,i,fs=8.5,afs=7.5,name_top=True):
+        s.text(x,y-1.2,f'Character {i+1}',fs,True)
+        if name_top: s.text(x+w,y-1.2,'name: ____________',7,col=HINT,align='r')
+        s.rect(x,y,w,h)
         for j,a in enumerate(ANIM): s.tick(x+j*w/4,y+h+1.5,a,4.5,afs)
     def lists(s,x,y,dx,dy,size,fs):
         if dx<40: s.text(x,y-2.2,'Background sound',8.5,True)
@@ -83,9 +85,11 @@ def story_header(s):
 def cast_page(s):
     story_header(s); s.text(196,15,'Page 1: The cast',11,True,black)
     s.text(10,22.5,'Draw your 6 characters. They will be in every scene. Use dark pens and bright colours. Stay inside the boxes.',8.5,True)
-    for i in range(6): s.char(10+(i%3)*95.5,31+(i//3)*68,86,52,i)
-    x,y,w,h=10,170,277,20; s.text(x,y-1.2,"Sounds I'll make",8.5,True); s.rect(x,y,w,h); s.text(x+2,y+5,'Write or draw each sound effect.',7)
-    for i in range(2): s.line(x+3,y+11+i*6,x+w-3,y+11+i*6)
+    for i in range(6):
+        x,y=10+(i%3)*95.5,30+(i//3)*83; s.char(x,y,86,52,i,name_top=False)
+        # under each character: its name and a really short description
+        s.text(x,y+64.5,'Name:',8,True); s.line(x+10,y+64.8,x+86,y+64.8,col=GREY,lw=.35)
+        s.text(x,y+71.5,'About them:',8,True); s.line(x+19,y+71.8,x+86,y+71.8,col=GREY,lw=.35)
     s.footer('cast','Scan this page first, then the scene pages. Tick how each character moves, or none to keep it still.')
 
 def stage_page(s,k):
@@ -104,8 +108,12 @@ def stage_page(s,k):
     else:
         s.text(196,119.5,'Tips',8.5,True)
         for i,t in enumerate(tips): s.text(196,124.5+i*4.4,'• '+t,7.5,col=HINT)
-    s.text(196,141,'Sounds in this scene',8.5,True); s.rect(196,142.2,91,44.8); s.text(198,147.2,'Which of your sounds happen here?',7,col=HINT)
-    for i in range(4): s.line(199,155+i*8,284,155+i*8)
+    s.text(196,141,'Sounds in this scene',8.5,True); s.rect(196,142.2,91,44.8)
+    s.text(198,147.5,'Background sounds',8,True); s.text(229,147.5,'(like birds, traffic, a crowd)',6.5,col=HINT)
+    for i in range(2): s.line(199,154.5+i*6.5,284,154.5+i*6.5)
+    s.line(196,164.6,287,164.6,col=GREY,lw=.4)
+    s.text(198,170,'Sound effects',8,True); s.text(219,170,'(like a door slam, a splash, "boing!")',6.5,col=HINT)
+    for i in range(2): s.line(199,177+i*6.5,284,177+i*6.5)
     s.footer(key,'Tick one background sound and one music. Tick everyone who is in this scene.')
 
 def make(path,title,pages):

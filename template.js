@@ -20,7 +20,7 @@ const Template=(()=>{
       anim:{dy:39.5,s:5,dx:[0,13.5,27,40.5]},amb:list(176,128,9.5,6,4),mus:list(201,128,9.5,6,4),notes:[{x:228,y:121,w:59,h:67}]},
     scene:{kind:'scene',bg:{x:10,y:25,w:160,h:90},script:{x:10,y:127,w:160,h:61},chars:grid(4,2,178,25,58,50,51,35),
       anim:{dy:36.5,s:4.5,dx:[0,12.75,25.5,38.25]},amb:list(178,128,8.5,5.5,7),mus:list(216,128,8.5,5.5,7),notes:[{x:245,y:127,w:42,h:61}]},
-    cast:{kind:'cast',chars:grid(6,3,10,31,95.5,68,86,52),anim:{dy:53.5,s:4.5,dx:[0,21.5,43,64.5]},notes:[{x:10,y:170,w:277,h:20}]},
+    cast:{kind:'cast',chars:grid(6,3,10,30,95.5,83,86,52),anim:{dy:53.5,s:4.5,dx:[0,21.5,43,64.5]},notes:grid(6,3,10,89,95.5,83,86,18)}, // notes: each character's name and description lines (read by the teacher, not scanned)
     orientation:{...STAGE,stage:'orientation'},complication:{...STAGE,stage:'complication'},resolution:{...STAGE,stage:'resolution'},
     next:{...STAGE,stage:'next',part:list(0,122,0,5.5,4).map((b,i)=>({...b,x:196+i*21}))}};
   const CODES={'1100':'scene','1000':'cast','0100':'orientation','0010':'complication','0110':'next','0001':'resolution','0000':'old'};
